@@ -1,0 +1,27 @@
+# Environment files (Contains private secrets)
+.env
+.env.local
+.env.*.local
+
+# Python bytecode & virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Data & Model caches
+/data/
+*.safetensors
+*.gguf
+.cache/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Prometheus runtime secrets
+prometheus/*password*.txt
+
