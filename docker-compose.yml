@@ -1,0 +1,85 @@
+services:
+  # 1. FastAPI Security Gateway & Interactive Web Playground
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: ai-gateway
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis-cache
+      - VLLM_BASE_URL=http://vllm-server:8000/v1
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis-cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # 2. Local LLM Inference Serving Host (Optional OpenAI-Compatible Host)
+  vllm-server:
+    image: vllm/vllm-openai:gemma4-cu130
+    container_name: vllm-server
+    runtime: nvidia
+    environment:
+      - HF_TOKEN=${HF_TOKEN:-${HUGGING_FACE_HUB_TOKEN:-}}
+      - VLLM_LOGGING_LEVEL=INFO
+      - VLLM_WORKER_MULTIPROC_METHOD=spawn
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+    volumes:
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    ports:
+      - "8000:8000"
+    command: >
+      ${VLLM_MODEL_NAME:-Qwen/Qwen2.5-0.5B-Instruct}
+      --gpu-memory-utilization 0.40
+      --max-model-len 2048
+      --max-num-seqs 8
+      --enforce-eager
+      --port 8000
+      --trust-remote-code
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # 3. Redis Stack (Vector Semantic Cache & Web Dashboard)
+  redis-cache:
+    image: redis/redis-stack:latest
+    container_name: redis-cache
+    ports:
+      - "6379:6379"
+      - "8001:8001" # RedisInsight UI
+    volumes:
+      - redis-data:/data
+    environment:
+      - REDIS_ARGS=--save 60 1 --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # 4. Prometheus Metrics Collector & PromQL Graph UI
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-server
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+    driver: local
