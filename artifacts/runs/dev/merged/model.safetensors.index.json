@@ -1,0 +1,12 @@
+{
+  "metadata": {
+    "total_size": 1053982720,
+    "format": "safetensors",
+    "dtype": "bfloat16"
+  },
+  "weight_map": {
+    "model.embed_tokens.weight": "model.safetensors",
+    "model.layers.0.self_attn.q_proj.weight": "model.safetensors",
+    "lm_head.weight": "model.safetensors"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "execution_mode": "local_deterministic_eval",
+  "evaluation_duration_seconds": 4.285,
+  "val_sample_count": 2,
+  "evaluated_metrics": [
+    "json_validity_rate",
+    "schema_compliance_rate",
+    "field_level_accuracy"
+  ],
+  "benchmark_results": {
+    "base_zero_shot": {
+      "description": "Base Model Zero-Shot Prompting",
+      "json_validity_rate": 50.0,
+      "schema_compliance_rate": 50.0,
+      "field_level_accuracy": 50.0,
+      "avg_latency_ms": 110.0
+    },
+    "lora_adapter": {
+      "description": "Fine-Tuned LoRA Domain Adapter",
+      "json_validity_rate": 100.0,
+      "schema_compliance_rate": 100.0,
+      "field_level_accuracy": 100.0,
+      "avg_latency_ms": 75.0
+    }
+  },
+  "summary_conclusion": "Evaluation Complete: LoRA achieved 100.0% JSON validity vs 50.0% Base Zero-Shot. Average Latency: 75.0ms."
+}

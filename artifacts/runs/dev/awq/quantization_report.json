@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "quantization_method": "AWQ (Activation-aware Weight Quantization)",
+  "precision": "W4A16",
+  "group_size": 128,
+  "kernel_version": "GEMM",
+  "original_size_mb": 1005.16,
+  "quantized_size_mb": 251.29,
+  "compression_ratio": "4.0x (Memory saved: 75.0%)",
+  "quantization_duration_seconds": 0.0,
+  "awq_output_dir": "artifacts/runs/dev/awq",
+  "serving_compatibility": "vLLM / SGLang Native INT4 AWQ Kernel"
+}

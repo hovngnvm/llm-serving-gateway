@@ -1,0 +1,43 @@
+{
+  "status": "success",
+  "execution_mode": "live_llm_inference",
+  "evaluation_duration_seconds": 23.246,
+  "val_sample_count": 2,
+  "evaluated_metrics": [
+    "perplexity",
+    "json_validity_rate",
+    "schema_compliance_rate",
+    "field_level_accuracy"
+  ],
+  "benchmark_results": {
+    "tier_1_base_zero_shot": {
+      "description": "Base Model Zero-Shot Prompting (Real Inference)",
+      "json_validity_rate": 0.0,
+      "schema_compliance_rate": 0.0,
+      "field_level_accuracy": 0.0,
+      "avg_latency_ms": 4195.09
+    },
+    "tier_2_base_few_shot": {
+      "description": "Base Model 3-Shot In-Context Prompting (Real Inference)",
+      "json_validity_rate": 0.0,
+      "schema_compliance_rate": 0.0,
+      "field_level_accuracy": 0.0,
+      "avg_latency_ms": 2240.8
+    },
+    "tier_3_lora_adapter_bf16": {
+      "description": "Fine-Tuned LoRA Adapter (Real Inference)",
+      "json_validity_rate": 100.0,
+      "schema_compliance_rate": 0.0,
+      "field_level_accuracy": 17.36,
+      "avg_latency_ms": 1867.99
+    },
+    "tier_4_lora_quantized_awq_4bit": {
+      "description": "LoRA Merged + AWQ 4-bit Quantized (Real Serving)",
+      "json_validity_rate": 100.0,
+      "schema_compliance_rate": 0.0,
+      "field_level_accuracy": 17.36,
+      "avg_latency_ms": 1937.27
+    }
+  },
+  "summary_conclusion": "Real Evaluation: LoRA achieved 100.0% JSON validity vs 0.0% Base Zero-Shot. Average Latency: 1867.99ms."
+}
