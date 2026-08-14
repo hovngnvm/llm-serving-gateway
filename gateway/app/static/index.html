@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enterprise AI Gateway - Interactive Playground &amp; Security Cockpit</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Top Header Navigation -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">AI</div>
+      <div>
+        <div class="brand-title">ENTERPRISE HYBRID CLOUD AI PLATFORM</div>
+        <div class="brand-subtitle">Private Multimodal Serving &amp; Decree 13/2023/NĐ-CP Security Gateway</div>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-pill">
+        <span class="dot-green" id="serverStatusDot"></span>
+        <span id="serverStatusText">CONNECTING...</span>
+      </div>
+      <div class="status-pill" style="gap: 8px;">
+        <span>MODEL ROUTE:</span>
+        <select id="modelSelect" style="background: rgba(15,23,42,0.9); color: var(--accent-cyan); border: 1px solid rgba(56,189,248,0.4); border-radius: 6px; padding: 3px 8px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; outline: none;">
+          <option value="auto">⚡ Auto-Intent Router (Dynamic)</option>
+          <option value="financial_adapter">🎯 financial_adapter (LoRA SFT)</option>
+          <option value="Qwen/Qwen2.5-0.5B-Instruct">🌐 Qwen2.5-0.5B (Base Model)</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Split Layout -->
+  <main>
+    <!-- Left Panel: Workspace & Input -->
+    <section class="panel-card">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span>⚡</span>
+          <span>Thử Nghiệm Request (End-User Input)</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        
+        <!-- Quick Fill Prompt Chips -->
+        <div class="input-group">
+          <label>MẪU CÂU HỎI THỰC TẾ (QUICK-FILL):</label>
+          <div class="quick-prompts">
+            <button class="chip-btn" onclick="selectPrompt('decree13')" style="border-color: var(--accent-cyan); color: var(--text-primary);">📜 Toàn diện NĐ 13/2023</button>
+            <button class="chip-btn" onclick="selectPrompt('banking')">💳 Giao dịch CCCD &amp; Thẻ</button>
+            <button class="chip-btn" onclick="selectPrompt('invoice')">🧾 Hóa đơn VAT Doanh nghiệp</button>
+            <button class="chip-btn" onclick="selectPrompt('chat')">💬 Hội thoại tự nhiên</button>
+            <button class="chip-btn" onclick="selectPrompt('jailbreak')">🚨 Thử Prompt Injection</button>
+          </div>
+        </div>
+
+        <!-- Prompt Textarea -->
+        <div class="input-group" style="flex: 1; display: flex; flex-direction: column;">
+          <label for="promptInput">NỘI DUNG PROMPT / YÊU CẦU:</label>
+          <textarea id="promptInput" class="prompt-box" placeholder="Nhập câu lệnh, số CCCD, Hộ chiếu, Thẻ, MST, GPS hoặc câu hỏi của bạn tại đây..."></textarea>
+        </div>
+
+        <!-- Multimodal Dropzone for Invoices/Receipts -->
+        <div class="input-group">
+          <label>ĐÍNH KÈM ẢNH HÓA ĐƠN / BIÊN LAI (MULTIMODAL):</label>
+          <div class="dropzone" id="dropzone">
+            <div id="dropzonePrompt">
+              <span style="font-size: 24px; display: block; margin-bottom: 4px;">📷</span>
+              <div class="dropzone-text">Kéo thả ảnh biên lai vào đây hoặc click để tải lên</div>
+            </div>
+            <div id="imagePreviewWrapper" class="image-preview-wrapper" style="display: none;">
+              <img id="imagePreview" src="" alt="Receipt Preview">
+              <button class="btn-remove-img" onclick="removeImage(event)">✕</button>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+          <button class="btn-primary" id="btnSend" onclick="executeRequest()">
+            <span>🚀</span>
+            <span>Gửi Tới AI Gateway</span>
+          </button>
+          <button class="btn-secondary" onclick="clearAll()">Xóa</button>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Right Panel: Multi-Tier Inspector & Live Output -->
+    <section class="panel-card">
+      
+      <!-- Tabs Navigation Header -->
+      <div class="tabs-header">
+        <button class="tab-btn active" data-tab="tabOutput">🤖 AI Output</button>
+        <button class="tab-btn" data-tab="tabPii">🛡️ PII &amp; NĐ 13 Security</button>
+        <button class="tab-btn" data-tab="tabPerformance">⚡ Latency &amp; Cache</button>
+        <button class="tab-btn" data-tab="tabSelfCorrection">🔄 Self-Correction &amp; Repair</button>
+      </div>
+
+      <!-- Tab 1: AI Output -->
+      <div class="tab-content active" id="tabOutput">
+        
+        <!-- Live Badges Strip -->
+        <div class="metrics-strip">
+          <div id="badgeCache">
+            <span class="status-pill">⏳ CHƯA CÓ DỮ LIỆU</span>
+          </div>
+          <div class="metric-badge">
+            <span class="metric-label">LATENCY:</span>
+            <span class="metric-val" id="metricLatency">-- ms</span>
+          </div>
+          <div class="metric-badge">
+            <span class="metric-label">PII REDACTED:</span>
+            <span class="metric-val" id="metricPii">0</span>
+          </div>
+          <div class="metric-badge">
+            <span class="metric-label">JSON REPAIR:</span>
+            <span class="metric-val" id="metricRepair">--</span>
+          </div>
+          <div class="metric-badge">
+            <span class="metric-label">SELF-CORRECTION:</span>
+            <span class="metric-val" id="metricSelfCorrection">--</span>
+          </div>
+        </div>
+
+        <!-- Text / Markdown Summary Section -->
+        <div style="margin-bottom: 18px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 0;">PHẢN HỒI VĂN BẢN &amp; BÁO CÁO (TEXT / MARKDOWN REPORT):</h4>
+            <button class="btn-download-md" id="btnDownloadMd" onclick="downloadMarkdownReport()" style="display: none;" title="Tải báo cáo dưới dạng file .md">
+              <span>📥</span>
+              <span>Tải Báo Cáo (.md)</span>
+            </button>
+          </div>
+          <div class="diff-box" id="textSummaryBox" style="font-size: 13.5px; font-family: var(--font-sans); color: var(--text-primary); white-space: pre-wrap;">
+            Hãy nhập prompt và nhấn 'Gửi Tới AI Gateway' để xem kết quả trực tiếp từ mô hình AI.
+          </div>
+        </div>
+
+        <!-- Structured Data Section -->
+        <div id="structuredDataSection" style="display: none;">
+          <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">DỮ LIỆU CẤU TRÚC (STRUCTURED DATA - VALID JSON):</h4>
+          <pre class="code-viewer" id="structuredJsonBox"></pre>
+        </div>
+
+      </div>
+
+      <!-- Tab 2: PII Redaction & Security Inspector -->
+      <div class="tab-content" id="tabPii">
+        <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">SO SÁNH BẢO MẬT PII THEO NGHỊ ĐỊNH 13/2023/NĐ-CP (PRESIDIO):</h4>
+        
+        <div class="diff-grid">
+          <div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600;">📥 RAW PROMPT GỐC (CHỨA PII NGUY CƠ CAO):</div>
+            <div class="diff-box" id="diffRawPrompt">--</div>
+          </div>
+          <div>
+            <div style="font-size: 11px; color: var(--accent-cyan); margin-bottom: 6px; font-weight: 600;">🛡️ MASKED PROMPT GỬI CHO LLM:</div>
+            <div class="diff-box masked" id="diffMaskedPrompt">--</div>
+          </div>
+        </div>
+
+        <div id="redactedImgWrapper" style="display: none; margin-top: 18px;">
+          <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 10px;">ĐỐI CHIẾU ẢNH BIÊN LAI GỐC VS. ẢNH ĐÃ LÀM MỜ PII (NĐ 13/2023/NĐ-CP):</h4>
+          <div class="diff-grid" style="align-items: start;">
+            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 8px; border: 1px solid var(--border-subtle); text-align: center;">
+              <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; font-weight: 600;">📷 ẢNH GỐC TẢI LÊN</div>
+              <img id="origImagePreview" src="" alt="Original Upload" style="max-height: 380px; max-width: 100%; border-radius: 6px; object-fit: contain;">
+            </div>
+            <div style="background: rgba(15, 23, 42, 0.6); padding: 12px; border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3); text-align: center;">
+              <div style="font-size: 11px; color: var(--accent-red); margin-bottom: 8px; font-weight: 600;">🛡️ ẢNH ĐÃ BÔI ĐEN PII (PRESIDIO REDACTED)</div>
+              <img id="redactedImagePreview" src="" alt="Redacted Image Preview" style="max-height: 380px; max-width: 100%; border-radius: 6px; object-fit: contain; box-shadow: 0 0 15px rgba(239, 68, 68, 0.15);">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Latency & Cache Performance -->
+      <div class="tab-content" id="tabPerformance">
+        <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">THỐNG KÊ HIỆU NĂNG &amp; SEMANTIC PROMPT CACHING:</h4>
+        
+        <div class="step-card">
+          <div class="step-icon">⚡</div>
+          <div class="step-info">
+            <h4>Trạng Thái Semantic Vector Cache</h4>
+            <p id="perfCacheHit">Chưa thực hiện truy vấn.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-icon">⏱️</div>
+          <div class="step-info">
+            <h4>Thời Gian Xử Lý Tại Gateway</h4>
+            <p id="perfGatewayLatency">-- ms</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-icon">🌐</div>
+          <div class="step-info">
+            <h4>Tổng Thời Gian Roundtrip Client-Server</h4>
+            <p id="perfNetworkRoundtrip">-- ms</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 4: 3-Step Self-Correction & JSON Auto-Repair -->
+      <div class="tab-content" id="tabSelfCorrection">
+        <h4 style="font-size: 13px; color: var(--text-secondary); margin-bottom: 14px;">KIỂM TOÁN CHẤT LƯỢNG ĐẦU RA (SELF-CORRECTION &amp; AUTO-REPAIR):</h4>
+
+        <div class="step-card">
+          <div class="step-icon">🔄</div>
+          <div class="step-info">
+            <h4>3-Step Reflection Loop (Schema &rarr; Grounding &rarr; Math Logic)</h4>
+            <p id="selfCorrectionStatus">Chưa thực hiện đánh giá.</p>
+          </div>
+        </div>
+
+        <div class="step-card">
+          <div class="step-icon">🛠️</div>
+          <div class="step-info">
+            <h4>Structured JSON Auto-Repair Middleware</h4>
+            <p id="jsonRepairStatus">Chưa phát hiện lỗi cú pháp.</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
