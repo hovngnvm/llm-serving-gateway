@@ -9,6 +9,8 @@ from typing import Any
 from PIL import Image
 import io
 
+from gateway.app.config import settings
+
 dummy_img = Image.new("RGB", (200, 100), color=(255, 255, 255))
 buf = io.BytesIO()
 dummy_img.save(buf, format="PNG")
@@ -43,7 +45,7 @@ class TestGatewayE2EPipeline(unittest.TestCase):
         if not self.client:
             self.skipTest("fastapi.testclient not installed")
 
-        headers = {"X-API-Key": "secret_enterprise_ai_key_2026"}
+        headers = {"X-API-Key": settings.gateway_api_key}
         payload = {
             "messages": [
                 {
@@ -60,7 +62,7 @@ class TestGatewayE2EPipeline(unittest.TestCase):
         if not self.client:
             self.skipTest("fastapi.testclient not installed")
 
-        headers = {"X-API-Key": "secret_enterprise_ai_key_2026"}
+        headers = {"X-API-Key": settings.gateway_api_key}
         raw_prompt = "Trích xuất biên lai chuyển tiền từ CCCD 079123456789 số thẻ 4111222233334444 sđt 0901234567 số tiền 5000000 VND"
 
         payload = {

@@ -6,6 +6,7 @@ Verifies offline rule routing and live gateway endpoints.
 import unittest
 import httpx
 
+from gateway.app.config import settings
 from gateway.app.core.intent_router import intent_router
 
 
@@ -43,7 +44,7 @@ class TestModelRouting(unittest.TestCase):
                     res = client.post(
                         "/v1/chat/completions",
                         json=payload,
-                        headers={"X-API-Key": "secret_enterprise_ai_key_2026"},
+                        headers={"X-API-Key": settings.gateway_api_key},
                     )
                     self.assertIn(res.status_code, [200, 503])
         except (httpx.ConnectError, httpx.TimeoutException):

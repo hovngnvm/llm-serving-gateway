@@ -8,6 +8,7 @@ import os
 import json
 import time
 from pathlib import Path
+from typing import Any
 import httpx
 from training.src.config_schema import PipelineConfig, PROJECT_ROOT
 from training.src.utils.logger import get_logger
@@ -114,7 +115,7 @@ class EvalEngine:
         field_acc = correct_fields / max(1, len(gt_keys))
         return True, is_compliant, field_acc
 
-    def evaluate(self, val_path: str, adapter_path: str | None = None) -> dict:
+    def evaluate(self, val_path: str, adapter_path: str | None = None) -> dict[str, Any]:
         """Executes model evaluation over validation dataset records."""
         logger.info("Executing Stage 3: Evaluation Engine (Base Zero-Shot vs LoRA Fine-Tuned)...")
         start_time = time.time()

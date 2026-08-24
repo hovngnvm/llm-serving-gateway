@@ -115,9 +115,6 @@ class PipelineConfig(BaseModel):
     intent_routing: IntentRoutingConfig = Field(default_factory=IntentRoutingConfig)
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-
-
 def load_pipeline_config(config_path: str) -> PipelineConfig:
     """Loads and validates a pipeline YAML configuration file against the Pydantic schema."""
     path = Path(config_path)

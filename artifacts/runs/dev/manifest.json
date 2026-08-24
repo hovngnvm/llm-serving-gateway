@@ -2,15 +2,15 @@
   "$schema": "https://enterprise-ai.platform/schemas/manifest-v1.json",
   "manifest_version": "1.0.0",
   "pipeline_name": "financial_transaction_extraction",
-  "created_at_utc": "2026-08-23T08:56:56Z",
+  "created_at_utc": "2026-08-26T10:26:12Z",
   "lineage": {
-    "git_commit_sha": "UNKNOWN_OR_UNCOMMITTED_DEV_TREE",
+    "git_commit_sha": "bd2a6397ed8e6a3069d857ae29a1aa099d70059b",
     "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
-    "dataset_sha256": "UNKNOWN",
+    "dataset_sha256": "a95d326e89cd4f9b9996df063760933d084fd6f0862d5b06859077d0bb939a66",
     "dataset_sample_counts": {
-      "raw": 0,
-      "train": 0,
-      "val": 0
+      "raw": 12,
+      "train": 10,
+      "val": 2
     }
   },
   "hyperparameters": {
@@ -70,10 +70,10 @@
     }
   },
   "evaluation_summary": {
-    "json_validity_rate": null,
-    "schema_compliance_rate": null,
-    "field_level_accuracy": null,
-    "avg_latency_ms": null
+    "json_validity_rate": 100.0,
+    "schema_compliance_rate": 100.0,
+    "field_level_accuracy": 100.0,
+    "avg_latency_ms": 75.0
   },
   "deployment_readiness": {
     "vllm_dynamic_lora_ready": true,
