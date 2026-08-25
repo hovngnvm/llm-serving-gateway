@@ -6,7 +6,7 @@ Prevents prompt injections, jailbreaks, and proprietary system instruction leaka
 import re
 from gateway.app.utils.logger import get_logger
 
-logger = get_logger("GuardrailsEngine")
+logger = get_logger(__name__)
 
 
 class GuardrailsEngine:

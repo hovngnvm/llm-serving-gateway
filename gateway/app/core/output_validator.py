@@ -10,7 +10,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, model_validator, ValidationError
 from gateway.app.utils.logger import get_logger
 
-logger = get_logger("OutputValidator")
+logger = get_logger(__name__)
 
 try:
     import json_repair

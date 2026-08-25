@@ -11,7 +11,7 @@ from typing import Any
 from training.src.config_schema import PipelineConfig, PROJECT_ROOT
 from training.src.utils.logger import get_logger
 
-logger = get_logger("ManifestBuilder")
+logger = get_logger(__name__)
 
 
 class ManifestBuilder:

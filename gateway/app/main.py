@@ -25,7 +25,7 @@ from gateway.app.core.guardrails_engine import guardrails_engine
 from gateway.app.core.intent_router import intent_router
 from gateway.app.db.neon_audit_logger import neon_audit_logger
 
-logger = get_logger("AIGateway")
+logger = get_logger(__name__)
 
 
 @asynccontextmanager

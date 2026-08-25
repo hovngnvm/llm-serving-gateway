@@ -25,7 +25,7 @@ from training.src.eval_engine import EvalEngine
 from training.src.manifest_builder import ManifestBuilder
 from training.src.utils.logger import get_logger
 
-logger = get_logger("PipelineOrchestrator")
+logger = get_logger(__name__)
 
 
 def run_pipeline(config_path: str, mode: str = "smoke-test", target_stage: int = 0) -> None:

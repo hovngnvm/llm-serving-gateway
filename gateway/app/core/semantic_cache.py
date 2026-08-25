@@ -11,7 +11,7 @@ from typing import Any
 from gateway.app.config import settings
 from gateway.app.utils.logger import get_logger
 
-logger = get_logger("SemanticPromptCache")
+logger = get_logger(__name__)
 
 
 class SemanticPromptCache:

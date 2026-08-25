@@ -14,7 +14,7 @@ import base64
 from PIL import Image, ImageDraw
 from gateway.app.utils.logger import get_logger
 
-logger = get_logger("PresidioDecree13Engine")
+logger = get_logger(__name__)
 
 
 class EntityDefinition:

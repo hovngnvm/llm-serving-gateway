@@ -7,7 +7,7 @@ import logging
 import sys
 
 
-def get_logger(name: str = "TrainingPipeline", level: int = logging.INFO) -> logging.Logger:
+def get_logger(name: str = __name__, level: int = logging.INFO) -> logging.Logger:
     """Factory function to build and configure a unified pipeline logger."""
     logger = logging.getLogger(name)
     logger.setLevel(level)
