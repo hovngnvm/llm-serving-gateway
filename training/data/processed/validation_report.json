@@ -1,6 +1,6 @@
 {
   "status": "success",
-  "raw_dataset_path": "training\\data\\raw\\sample_financial_alpaca.jsonl",
+  "raw_dataset_path": "training/data/raw/sample_financial_alpaca.jsonl",
   "raw_dataset_sha256": "a95d326e89cd4f9b9996df063760933d084fd6f0862d5b06859077d0bb939a66",
   "raw_sample_count": 12,
   "deduped_sample_count": 12,
@@ -16,8 +16,8 @@
     "TAX_ID": 16
   },
   "artifacts": {
-    "train_file": "\\\\wsl.localhost\\Ubuntu\\home\\d1ego23\\PRJCT\\GATEWAY\\training\\data\\processed\\train.jsonl",
-    "val_file": "\\\\wsl.localhost\\Ubuntu\\home\\d1ego23\\PRJCT\\GATEWAY\\training\\data\\processed\\val.jsonl",
-    "calibration_file": "\\\\wsl.localhost\\Ubuntu\\home\\d1ego23\\PRJCT\\GATEWAY\\training\\data\\processed\\calibration.jsonl"
+    "train_file": "training/data/processed/train.jsonl",
+    "val_file": "training/data/processed/val.jsonl",
+    "calibration_file": "training/data/processed/calibration.jsonl"
   }
 }

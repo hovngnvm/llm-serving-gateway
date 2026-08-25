@@ -166,9 +166,15 @@ class DatasetValidator:
             for r in calibration_records:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+        def _to_portable(p: Path) -> str:
+            try:
+                return p.relative_to(PROJECT_ROOT).as_posix()
+            except ValueError:
+                return p.as_posix()
+
         report = {
             "status": "success",
-            "raw_dataset_path": str(raw_path),
+            "raw_dataset_path": _to_portable(raw_path),
             "raw_dataset_sha256": raw_sha256,
             "raw_sample_count": len(raw_records),
             "deduped_sample_count": len(deduped_records),
@@ -177,9 +183,9 @@ class DatasetValidator:
             "calibration_sample_count": len(calibration_records),
             "pii_audit_counts": total_pii_stats,
             "artifacts": {
-                "train_file": str(train_file),
-                "val_file": str(val_file),
-                "calibration_file": str(calib_file),
+                "train_file": _to_portable(train_file),
+                "val_file": _to_portable(val_file),
+                "calibration_file": _to_portable(calib_file),
             }
         }
 

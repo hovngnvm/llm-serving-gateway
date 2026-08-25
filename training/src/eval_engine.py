@@ -13,17 +13,17 @@ import httpx
 from training.src.config_schema import PipelineConfig, PROJECT_ROOT
 from training.src.utils.logger import get_logger
 
-logger = get_logger("EvalEngine")
+logger = get_logger(__name__)
 
 
 class EvalEngine:
     def __init__(
         self,
         config: PipelineConfig,
-        endpoint_url: str = os.getenv("GATEWAY_BASE_URL", "http://localhost:8000/v1")
+        endpoint_url: str | None = None
     ) -> None:
         self.config = config
-        self.endpoint_url = endpoint_url
+        self.endpoint_url = endpoint_url or os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
         out_dir = Path(config.training.output_dir)
         self.output_dir = out_dir if out_dir.is_absolute() else PROJECT_ROOT / out_dir
         self.eval_dir = self.output_dir / "eval"
@@ -77,7 +77,7 @@ class EvalEngine:
             latency_ms = (time.perf_counter() - t_start) * 1000
             return f"CONNECTION_ERROR: {e}", round(latency_ms, 2), 0
 
-    def evaluate_json_payload(self, text_output: str, ground_truth: dict) -> tuple[bool, bool, float]:
+    def evaluate_json_payload(self, text_output: str, ground_truth: dict[str, Any]) -> tuple[bool, bool, float]:
         """
         Evaluates model output string against ground truth JSON:
         Returns: (is_valid_json, is_schema_compliant, field_accuracy_ratio)
