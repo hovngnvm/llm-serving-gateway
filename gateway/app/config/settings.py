@@ -8,32 +8,27 @@ import os
 from functools import lru_cache
 from pathlib import Path
 from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Base Directory Resolution
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 GATEWAY_DIR = PROJECT_ROOT / "gateway"
 APP_DIR = GATEWAY_DIR / "app"
 STATIC_DIR = APP_DIR / "static"
 ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
 LOGS_DIR = PROJECT_ROOT / "logs"
 
-# Auto-bootstrap runtime directories
-for runtime_dir in [ARTIFACTS_DIR, LOGS_DIR, STATIC_DIR]:
-    runtime_dir.mkdir(parents=True, exist_ok=True)
-
-
-try:
-    from pydantic_settings import BaseSettings, SettingsConfigDict
-except ImportError:
-    from pydantic import BaseModel as BaseSettings  # type: ignore
-    SettingsConfigDict = dict  # type: ignore
+def ensure_directories() -> None:
+    """Safely bootstrap runtime directories without import-time side-effects."""
+    for runtime_dir in [ARTIFACTS_DIR, LOGS_DIR, STATIC_DIR]:
+        runtime_dir.mkdir(parents=True, exist_ok=True)
 
 
 class Settings(BaseSettings):
     """Centralized System Settings loaded from environment variables."""
 
     vllm_base_url: str = Field(default="http://localhost:8000/v1", alias="VLLM_BASE_URL")
-    vllm_model_name: str = Field(default="meta-llama/Llama-3.1-8B-Instruct", alias="VLLM_MODEL_NAME")
+    vllm_model_name: str = Field(default="Qwen/Qwen2.5-0.5B-Instruct", alias="VLLM_MODEL_NAME")
     hugging_face_hub_token: str | None = Field(default=None, alias="HUGGING_FACE_HUB_TOKEN")
 
     redis_host: str = Field(default="localhost", alias="REDIS_HOST")
@@ -53,6 +48,7 @@ class Settings(BaseSettings):
         env_file=str(PROJECT_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        case_sensitive=False,
     )
 
 

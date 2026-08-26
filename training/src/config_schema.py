@@ -1,16 +1,15 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 import yaml
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from training.src.utils.paths import PROJECT_ROOT, resolve_path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-load_dotenv(PROJECT_ROOT / ".env")
+DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-0.5B-Instruct"
 
 
 class ModelConfig(BaseModel):
     base_model_name: str = Field(
-        default_factory=lambda: os.getenv("VLLM_MODEL_NAME", "Qwen/Qwen2.5-0.5B-Instruct")
+        default_factory=lambda: os.getenv("VLLM_MODEL_NAME", DEFAULT_BASE_MODEL)
     )
     torch_dtype: str = Field(default="bfloat16")
     max_seq_length: int = Field(default=1024, ge=128, le=32768)
@@ -18,9 +17,9 @@ class ModelConfig(BaseModel):
 
     @field_validator("base_model_name", mode="before")
     @classmethod
-    def populate_from_env_if_none(cls, v: str | None) -> str:
+    def populate_from_env_if_empty(cls, v: str | None) -> str:
         if not v:
-            return os.getenv("VLLM_MODEL_NAME", "Qwen/Qwen2.5-0.5B-Instruct")
+            return os.getenv("VLLM_MODEL_NAME", DEFAULT_BASE_MODEL)
         return v
 
 
@@ -115,14 +114,9 @@ class PipelineConfig(BaseModel):
     intent_routing: IntentRoutingConfig = Field(default_factory=IntentRoutingConfig)
 
 
-def load_pipeline_config(config_path: str) -> PipelineConfig:
+def load_pipeline_config(config_path: str | Path) -> PipelineConfig:
     """Loads and validates a pipeline YAML configuration file against the Pydantic schema."""
-    path = Path(config_path)
-    if not path.is_absolute() and not path.exists():
-        fallback_path = PROJECT_ROOT / config_path
-        if fallback_path.exists():
-            path = fallback_path
-
+    path = resolve_path(config_path)
     if not path.exists():
         raise FileNotFoundError(f"Configuration file not found: {config_path}")
 
