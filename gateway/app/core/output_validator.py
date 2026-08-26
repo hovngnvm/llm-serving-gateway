@@ -7,16 +7,13 @@ Replaces arbitrary heuristic if/else checks with standard declarative data contr
 import json
 import re
 from typing import Any, Literal
+import json_repair
 from pydantic import BaseModel, Field, model_validator, ValidationError
 from gateway.app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-try:
-    import json_repair
-    HAS_JSON_REPAIR = True
-except ImportError:
-    HAS_JSON_REPAIR = False
+FLOAT_TOLERANCE = 0.01
 
 
 class FinancialTransactionSchema(BaseModel):
@@ -38,7 +35,7 @@ class FinancialTransactionSchema(BaseModel):
         """Declaratively verifies arithmetic consistency when line items are present."""
         if self.subtotal is not None and self.tax is not None and self.total is not None:
             expected = round(self.subtotal + self.tax, 2)
-            if abs(expected - round(self.total, 2)) > 0.01:
+            if abs(expected - round(self.total, 2)) > FLOAT_TOLERANCE:
                 raise ValueError(
                     f"Arithmetic imbalance: subtotal ({self.subtotal}) + tax ({self.tax}) = {expected}, but total is {self.total}"
                 )
@@ -53,7 +50,7 @@ class OutputValidator:
         self.auto_repair_count = 0
 
     def extract_json_string(self, text: str) -> str | None:
-        """Extracts JSON substring from markdown code blocks or raw strings."""
+        """Extracts JSON substring from markdown code blocks, bracket bounds, or raw strings."""
         if not text or not text.strip():
             return None
 
@@ -69,6 +66,17 @@ class OutputValidator:
 
         if cleaned.startswith("{") or cleaned.startswith("["):
             return cleaned
+
+        # Scan for first opening bracket and last closing bracket for unfenced conversational responses
+        first_brace = cleaned.find("{")
+        last_brace = cleaned.rfind("}")
+        if first_brace != -1 and last_brace > first_brace:
+            return cleaned[first_brace:last_brace + 1].strip()
+
+        first_bracket = cleaned.find("[")
+        last_bracket = cleaned.rfind("]")
+        if first_bracket != -1 and last_bracket > first_bracket:
+            return cleaned[first_bracket:last_bracket + 1].strip()
 
         return None
 
@@ -89,12 +97,9 @@ class OutputValidator:
         if open_brackets > close_brackets:
             cleaned += "]" * (open_brackets - close_brackets)
 
-        cleaned = re.sub(r",\s*}", "}", cleaned)
-        cleaned = re.sub(r",\s*]", "]", cleaned)
-
         try:
             return json.loads(cleaned)
-        except Exception:
+        except (json.JSONDecodeError, ValueError):
             return None
 
     def parse_and_validate(
@@ -119,15 +124,14 @@ class OutputValidator:
             raw_dict = json.loads(json_str)
         except json.JSONDecodeError:
             # 2. Syntax Auto-Repair if malformed
-            if HAS_JSON_REPAIR:
-                try:
-                    repaired = json_repair.repair_json(json_str, return_objects=True)
-                    if isinstance(repaired, (dict, list)):
-                        raw_dict = repaired
-                        was_repaired = True
-                        self.auto_repair_count += 1
-                except Exception:
-                    pass
+            try:
+                repaired = json_repair.repair_json(json_str, return_objects=True)
+                if isinstance(repaired, (dict, list)):
+                    raw_dict = repaired
+                    was_repaired = True
+                    self.auto_repair_count += 1
+            except Exception as repair_err:
+                logger.debug(f"json_repair attempt failed: {repair_err}")
 
             if raw_dict is None:
                 repaired = self._fallback_repair(json_str)

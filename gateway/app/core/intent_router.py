@@ -4,39 +4,41 @@ Automatically discovers trained LoRA adapters from MLOps manifest.json contracts
 or registers new domain adapters dynamically via REST APIs without manual code changes.
 """
 
-import re
 import json
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from gateway.app.config import PROJECT_ROOT, get_settings
+from gateway.app.config import ARTIFACTS_DIR, PROJECT_ROOT, get_settings
 from gateway.app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+DEFAULT_ROUTING_STRATEGY = "Strategy 2 (Dynamic Multi-LoRA)"
+DEFAULT_ADAPTER_PRIORITY = 10
+FINANCIAL_ADAPTER_PRIORITY = 20
 
+
+@dataclass(slots=True)
 class DomainIntentRule:
-    def __init__(
-        self,
-        target_model: str,
-        description: str,
-        keywords: list[str],
-        regex_patterns: list[str] | None = None,
-        strategy: str = "Strategy 2 (Dynamic Multi-LoRA)",
-        min_priority: int = 10,
-    ) -> None:
-        self.target_model = target_model
-        self.description = description
-        self.strategy = strategy
-        self.keywords = [k.lower() for k in keywords]
-        self.regexes = [re.compile(p, re.IGNORECASE) for p in (regex_patterns or [])]
-        self.priority = min_priority
+    target_model: str
+    description: str
+    keywords: list[str]
+    regex_patterns: list[str] = field(default_factory=list)
+    strategy: str = DEFAULT_ROUTING_STRATEGY
+    priority: int = DEFAULT_ADAPTER_PRIORITY
+    regexes: list[re.Pattern[str]] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.keywords = [k.lower() for k in self.keywords]
+        self.regexes = [re.compile(p, re.IGNORECASE) for p in self.regex_patterns]
 
 
 class IntentRouter:
     def __init__(self, default_base_model: str | None = None) -> None:
         self.default_base_model = default_base_model or get_settings().vllm_model_name
         self.rules: dict[str, DomainIntentRule] = {}
-        
+
         self.register_adapter(
             target_model="financial_adapter",
             description="Fine-Tuned LoRA Adapter for Vietnamese Financial & Transaction Extraction",
@@ -44,13 +46,13 @@ class IntentRouter:
                 "chuyển tiền", "chuyển khoản", "stk", "số tài khoản", "tài khoản",
                 "giao dịch", "vnd", "nạp tiền", "rút tiền", "sao kê", "thẻ tín dụng",
                 "cccd", "cmnd", "mã pin", "otp", "ngân hàng", "vietcombank", "techcombank",
-                "mbbank", "acb", "vpbank", "bidv", "vietinbank", "tpbank", "vnpay", "momo"
+                "mbbank", "acb", "vpbank", "bidv", "vietinbank", "tpbank", "vnpay", "momo",
             ],
             regex_patterns=[
                 r"\b\d{1,3}(?:[.,]\d{3})*\s*(?:vnd|đ|dong|nghìn|triệu|k)\b",
-                r"(?i)\b(?:stk|tk|số thẻ)[:\s]*\d{8,19}\b"
+                r"(?i)\b(?:stk|tk|số thẻ)[:\s]*\d{8,19}\b",
             ],
-            priority=20
+            priority=FINANCIAL_ADAPTER_PRIORITY,
         )
 
         self.auto_discover_from_artifacts()
@@ -61,17 +63,17 @@ class IntentRouter:
         description: str,
         keywords: list[str],
         regex_patterns: list[str] | None = None,
-        strategy: str = "Strategy 2 (Dynamic Multi-LoRA)",
-        priority: int = 10,
+        strategy: str = DEFAULT_ROUTING_STRATEGY,
+        priority: int = DEFAULT_ADAPTER_PRIORITY,
     ) -> bool:
         """Dynamically registers or updates a domain LoRA adapter rule at runtime."""
         self.rules[target_model] = DomainIntentRule(
             target_model=target_model,
             description=description,
             keywords=keywords,
-            regex_patterns=regex_patterns,
+            regex_patterns=regex_patterns or [],
             strategy=strategy,
-            min_priority=priority,
+            priority=priority,
         )
         logger.info(f"Registered adapter '{target_model}' dynamically ({len(keywords)} keywords).")
         return True
@@ -81,16 +83,16 @@ class IntentRouter:
         Auto-scans the artifacts directory for all manifest.json files and registers
         newly trained LoRA adapters dynamically without manual code modification.
         """
-        artifacts_path = Path(root_artifacts_dir) if root_artifacts_dir else (PROJECT_ROOT / "artifacts" / "runs")
+        artifacts_path = Path(root_artifacts_dir) if root_artifacts_dir else (ARTIFACTS_DIR / "runs")
         if not artifacts_path.exists():
-            return 0
+            artifacts_path = PROJECT_ROOT / "artifacts" / "runs"
+            if not artifacts_path.exists():
+                return 0
 
         discovered_count = 0
-        for manifest_file in artifacts_path.glob("*/manifest.json"):
+        for manifest_file in artifacts_path.glob("**/manifest.json"):
             try:
-                with open(manifest_file, "r", encoding="utf-8") as f:
-                    manifest = json.load(f)
-
+                manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
                 pipeline_name = manifest.get("pipeline_name", "")
                 intent_cfg = manifest.get("intent_routing")
 
@@ -110,7 +112,7 @@ class IntentRouter:
         self,
         prompt: str,
         requested_model: str | None = None,
-        pii_count: int = 0
+        pii_count: int = 0,
     ) -> dict[str, Any]:
         """Dynamically resolves the target serving model or LoRA adapter."""
         prompt_clean = prompt.strip()
@@ -121,7 +123,7 @@ class IntentRouter:
                 "target_model": requested_model,
                 "routing_strategy": "client_explicit",
                 "matched_domain": None,
-                "reason": f"Client explicitly specified target model: '{requested_model}'."
+                "reason": f"Client explicitly specified target model: '{requested_model}'.",
             }
 
         sorted_rules = sorted(self.rules.values(), key=lambda r: r.priority, reverse=True)
@@ -132,7 +134,7 @@ class IntentRouter:
                         "target_model": rule.target_model,
                         "routing_strategy": "intent_detected",
                         "matched_domain": rule.target_model,
-                        "reason": f"Detected domain keyword '{kw}' in prompt -> routed to '{rule.target_model}'."
+                        "reason": f"Detected domain keyword '{kw}' in prompt -> routed to '{rule.target_model}'.",
                     }
 
             for regex in rule.regexes:
@@ -141,7 +143,7 @@ class IntentRouter:
                         "target_model": rule.target_model,
                         "routing_strategy": "intent_detected",
                         "matched_domain": rule.target_model,
-                        "reason": f"Matched domain pattern in prompt -> routed to '{rule.target_model}'."
+                        "reason": f"Matched domain pattern in prompt -> routed to '{rule.target_model}'.",
                     }
 
         if pii_count > 0 and "financial_adapter" in self.rules:
@@ -149,14 +151,14 @@ class IntentRouter:
                 "target_model": "financial_adapter",
                 "routing_strategy": "intent_detected",
                 "matched_domain": "financial_adapter",
-                "reason": f"Detected {pii_count} personal data entities under Decree 13/2023/NĐ-CP."
+                "reason": f"Detected {pii_count} personal data entities under Decree 13/2023/NĐ-CP.",
             }
 
         return {
             "target_model": self.default_base_model,
             "routing_strategy": "fallback_base",
             "matched_domain": "general_conversational",
-            "reason": f"No domain-specific intent detected. Falling back to Base Model: '{self.default_base_model}'."
+            "reason": f"No domain-specific intent detected. Falling back to Base Model: '{self.default_base_model}'.",
         }
 
     def get_registered_models(self) -> list[dict[str, Any]]:
