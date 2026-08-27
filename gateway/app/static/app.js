@@ -2,7 +2,16 @@
 
 let currentImageB64 = "";
 let lastResponseData = null;
-const API_KEY = "secret_enterprise_ai_key_2026";
+
+const DEFAULT_API_KEY = "secret_enterprise_ai_key_2026";
+const HEALTH_POLL_INTERVAL_MS = 4000;
+const MODELS_POLL_INTERVAL_MS = 10000;
+const DEFAULT_TEMPERATURE = 0.2;
+const DEFAULT_MAX_TOKENS = 512;
+
+function getApiKey() {
+  return localStorage.getItem("gateway_api_key") || DEFAULT_API_KEY;
+}
 
 // Quick Fill Prompts (Including Decree 13/2023/NĐ-CP Comprehensive Test)
 const PROMPT_TEMPLATES = {
@@ -16,9 +25,8 @@ const PROMPT_TEMPLATES = {
 document.addEventListener("DOMContentLoaded", () => {
   fetchGatewayHealth();
   fetchAvailableModels();
-  // Auto-polling heartbeat every 4 seconds to reflect live gateway status
-  setInterval(fetchGatewayHealth, 4000);
-  setInterval(fetchAvailableModels, 10000);
+  setInterval(fetchGatewayHealth, HEALTH_POLL_INTERVAL_MS);
+  setInterval(fetchAvailableModels, MODELS_POLL_INTERVAL_MS);
   initTabs();
   initDropzone();
 });
@@ -193,8 +201,8 @@ async function executeRequest() {
         content: currentImageB64 ? messagesContent : promptText,
       }
     ],
-    temperature: 0.2,
-    max_tokens: 512
+    temperature: DEFAULT_TEMPERATURE,
+    max_tokens: DEFAULT_MAX_TOKENS,
   };
 
   const t0 = performance.now();
@@ -203,7 +211,7 @@ async function executeRequest() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-API-Key": API_KEY
+        "X-API-Key": getApiKey()
       },
       body: JSON.stringify(payload)
     });
@@ -325,7 +333,7 @@ function downloadMarkdownReport() {
 
   const requestId = lastResponseData.request_id || `req-${Date.now().toString(16)}`;
   const timestamp = new Date().toISOString();
-  const modelId = meta.model_id || "Qwen2.5-Instruct";
+  const modelId = meta.model_id || "Foundation-Model";
   const latencyMs = meta.execution_time_ms || 0;
   const piiCount = meta.pii_redacted_count || 0;
 

@@ -5,7 +5,6 @@ Enterprise AI Platform Entrypoint & Interactive Web Playground.
 
 import time
 import uuid
-from pathlib import Path
 from typing import Any
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Security, Depends, Request, BackgroundTasks
@@ -16,7 +15,7 @@ from pydantic import BaseModel, Field
 import httpx
 from prometheus_fastapi_instrumentator import Instrumentator
 
-from gateway.app.config import settings
+from gateway.app.config import STATIC_DIR, settings, ensure_directories
 from gateway.app.utils.logger import get_logger
 from gateway.app.core.presidio_engine import presidio_engine
 from gateway.app.core.semantic_cache import semantic_cache
@@ -27,16 +26,29 @@ from gateway.app.db.neon_audit_logger import neon_audit_logger
 
 logger = get_logger(__name__)
 
+MAX_OUTPUT_TOKENS_CEILING = 512
+DEFAULT_FALLBACK_IP = "127.0.0.1"
+MARKDOWN_INDICATORS = ["```", "#", "|", "**", "- ", "\n1.", "\n* ", "__"]
+DEFAULT_ROUTING_STRATEGY = "Strategy 2 (Dynamic Multi-LoRA)"
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("AI Serving & Security Gateway initialized successfully.")
+    ensure_directories()
+    # Singleton HTTP Async Client with connection pooling
+    app.state.http_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=3.0, read=60.0, write=10.0, pool=10.0),
+        limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
+    )
+    logger.info("AI Serving & Security Gateway initialized with connection pooling.")
     try:
         await neon_audit_logger.init_db()
         logger.info("Neon Serverless PostgreSQL Cloud connection verified.")
     except Exception as e:
         logger.warning(f"Neon DB initialization notice: {e}")
     yield
+    if hasattr(app.state, "http_client") and app.state.http_client:
+        await app.state.http_client.aclose()
 
 
 app = FastAPI(
@@ -49,7 +61,6 @@ app = FastAPI(
 # Prometheus Telemetry Instrumentation (Mandatory Core Service)
 Instrumentator().instrument(app).expose(app, endpoint=settings.prometheus_metrics_path)
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
@@ -107,7 +118,7 @@ class RegisterAdapterRequest(BaseModel):
     description: str
     keywords: list[str]
     regex_patterns: list[str] | None = None
-    strategy: str | None = "Strategy 2 (Dynamic Multi-LoRA)"
+    strategy: str | None = DEFAULT_ROUTING_STRATEGY
     priority: int | None = 10
 
 
@@ -128,7 +139,7 @@ async def register_new_adapter(req: RegisterAdapterRequest) -> dict[str, Any]:
         description=req.description,
         keywords=req.keywords,
         regex_patterns=req.regex_patterns,
-        strategy=req.strategy or "Strategy 2 (Dynamic Multi-LoRA)",
+        strategy=req.strategy or DEFAULT_ROUTING_STRATEGY,
         priority=req.priority or 10,
     )
     return {
@@ -157,7 +168,7 @@ async def chat_completions(
 ) -> dict[str, Any]:
     start_time = time.time()
     request_id = f"req-{uuid.uuid4().hex[:12]}"
-    client_ip = http_request.client.host if http_request.client else "127.0.0.1"
+    client_ip = http_request.client.host if http_request.client else DEFAULT_FALLBACK_IP
 
     raw_prompt = ""
     raw_image_b64 = ""
@@ -222,32 +233,46 @@ async def chat_completions(
                 masked_prompt = f"Extract information from the following invoice:\n\n--- OCR EXTRACTED TEXT (SANITIZED) ---\n{ocr_masked_text}"
 
     raw_llm_response = ""
-    max_tokens_clamped = min(request_data.max_tokens or 512, 512)
+    max_tokens_clamped = min(request_data.max_tokens or MAX_OUTPUT_TOKENS_CEILING, MAX_OUTPUT_TOKENS_CEILING)
+
+    # Use Singleton HTTP Client from FastAPI lifespan or create fallback
+    client = getattr(http_request.app.state, "http_client", None)
+    close_client = False
+    if client is None:
+        client = httpx.AsyncClient(timeout=httpx.Timeout(connect=3.0, read=60.0, write=10.0, pool=10.0))
+        close_client = True
+
     try:
-        timeout_cfg = httpx.Timeout(connect=3.0, read=60.0, write=10.0, pool=10.0)
-        async with httpx.AsyncClient(timeout=timeout_cfg) as client:
-            vllm_payload = {
-                "model": resolved_model or settings.vllm_model_name,
-                "messages": [{"role": "user", "content": masked_prompt}],
-                "temperature": request_data.temperature,
-                "max_tokens": max_tokens_clamped,
-            }
-            resp = await client.post(
-                f"{settings.vllm_base_url}/chat/completions",
-                json=vllm_payload,
-            )
-            if resp.status_code == 200:
-                vllm_data = resp.json()
-                raw_llm_response = vllm_data["choices"][0]["message"]["content"]
-            else:
-                logger.error(f"vLLM returned HTTP {resp.status_code}: {resp.text}")
-                raise Exception(f"vLLM status {resp.status_code}: {resp.text}")
+        vllm_payload = {
+            "model": resolved_model or settings.vllm_model_name,
+            "messages": [{"role": "user", "content": masked_prompt}],
+            "temperature": request_data.temperature,
+            "max_tokens": max_tokens_clamped,
+        }
+        resp = await client.post(
+            f"{settings.vllm_base_url}/chat/completions",
+            json=vllm_payload,
+        )
+        if resp.status_code == 200:
+            vllm_data = resp.json()
+            raw_llm_response = vllm_data["choices"][0]["message"]["content"]
+        else:
+            logger.error(f"vLLM returned HTTP {resp.status_code}: {resp.text}")
+            raise Exception(f"vLLM status {resp.status_code}: {resp.text}")
     except Exception as e:
         logger.error(f"vLLM inference serving error: {e}")
         raise HTTPException(
             status_code=503,
             detail=f"AI Inference Engine is currently initializing or unreachable ({type(e).__name__}). Please ensure vLLM is loaded.",
         )
+    finally:
+        if close_client:
+            await client.aclose()
+
+    # Guardrails post-inference check
+    is_output_safe, output_violation = guardrails_engine.validate_output(raw_llm_response)
+    if not is_output_safe:
+        raise HTTPException(status_code=502, detail=output_violation)
 
     target_schema = FinancialTransactionSchema if (resolved_model == "financial_adapter" or "financial" in str(resolved_model).lower()) else None
     parsed_json, is_valid, validation_errors, was_repaired = output_validator.parse_and_validate(
@@ -260,8 +285,7 @@ async def chat_completions(
     if parsed_json and isinstance(parsed_json, dict) and not parsed_json.get("error"):
         formats["structured_data"] = parsed_json
 
-    markdown_indicators = ["```", "#", "|", "**", "- ", "\n1.", "\n* ", "__"]
-    if not formats.get("structured_data") and any(ind in raw_llm_response for ind in markdown_indicators):
+    if not formats.get("structured_data") and any(ind in raw_llm_response for ind in MARKDOWN_INDICATORS):
         formats["markdown_report"] = presidio_engine.unmask_text(raw_llm_response, pii_mapping)
 
     if parsed_json and isinstance(parsed_json, dict) and parsed_json.get("message"):
