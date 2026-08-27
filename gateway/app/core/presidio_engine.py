@@ -8,31 +8,33 @@ Categorized into:
 2. Dữ liệu cá nhân nhạy cảm (Sensitive Personal Data - Điều 2 Khoản 4 NĐ 13/2023/NĐ-CP)
 """
 
+import base64
 import io
 import re
-import base64
-from PIL import Image, ImageDraw
+from dataclasses import dataclass
+from PIL import Image, ImageDraw, ImageFont, ImageOps
+import pytesseract
+from pytesseract import Output
 from gateway.app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+REDACTION_FILL_COLOR = (15, 23, 42)
+REDACTION_BORDER_COLOR = (239, 68, 68)
+REDACTION_TEXT_COLOR = (248, 250, 252)
+BANNER_BG_COLOR = (16, 185, 129)
+BANNER_TEXT_COLOR = (255, 255, 255)
+MAX_OCR_SCALING_DIM = 1600.0
 
+
+@dataclass(slots=True)
 class EntityDefinition:
-    def __init__(
-        self,
-        code: str,
-        name: str,
-        category: str,
-        legal_ref: str,
-        pattern: re.Pattern,
-        priority: int = 10,
-    ) -> None:
-        self.code = code
-        self.name = name
-        self.category = category
-        self.legal_ref = legal_ref
-        self.pattern = pattern
-        self.priority = priority
+    code: str
+    name: str
+    category: str
+    legal_ref: str
+    pattern: re.Pattern[str]
+    priority: int = 10
 
 
 class PresidioPIIEngine:
@@ -110,7 +112,7 @@ class PresidioPIIEngine:
                 name="Địa chỉ thư điện tử (Email)",
                 category="BASIC_PERSONAL_DATA",
                 legal_ref="Điều 2 Khoản 3 Điểm d NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,7}\b"),
+                pattern=re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,7}\b"),
                 priority=20,
             ),
             EntityDefinition(
@@ -194,11 +196,11 @@ class PresidioPIIEngine:
                 if match.groups() and match.group(1):
                     start = match.start(1)
                     end = match.end(1)
-                    val = match.group(1).strip()
+                    val = text[start:end]
                 else:
                     start = match.start()
                     end = match.end()
-                    val = match.group(0).strip()
+                    val = text[start:end]
 
                 candidate_spans.append((start, end, entity.code, val, entity.priority))
 
@@ -277,19 +279,14 @@ class PresidioPIIEngine:
 
             font = None
             try:
-                from PIL import ImageFont
                 font = ImageFont.load_default()
-            except Exception:
-                pass
+            except Exception as font_err:
+                logger.debug(f"Failed to load default ImageFont: {font_err}")
 
             extracted_lines = []
             redaction_boxes = []
 
             try:
-                import pytesseract
-                from pytesseract import Output
-                from PIL import ImageOps
-                
                 candidate_crops = [
                     (0.0, 0.0, 1.0, 1.0),
                     (0.26, 0.12, 0.75, 0.88),
@@ -303,15 +300,15 @@ class PresidioPIIEngine:
                 for x1_pct, y1_pct, x2_pct, y2_pct in candidate_crops:
                     cx1, cy1 = int(x1_pct * width), int(y1_pct * height)
                     cx2, cy2 = int(x2_pct * width), int(y2_pct * height)
-                    
+
                     sub_crop = image.crop((cx1, cy1, cx2, cy2))
-                    scale = max(1.0, 1600.0 / max(sub_crop.width, sub_crop.height))
+                    scale = max(1.0, MAX_OCR_SCALING_DIM / max(sub_crop.width, sub_crop.height))
                     scaled = sub_crop.resize((int(sub_crop.width * scale), int(sub_crop.height * scale)), Image.Resampling.LANCZOS)
                     gray = scaled.convert("L")
                     enhanced = ImageOps.autocontrast(gray)
-                    
+
                     ocr_data = pytesseract.image_to_data(enhanced, lang="vie+eng", output_type=Output.DICT, config="--psm 6")
-                    
+
                     current_lines = {}
                     tokens_count = 0
                     n_boxes = len(ocr_data.get("text", []))
@@ -320,12 +317,12 @@ class PresidioPIIEngine:
                         text = ocr_data["text"][i].strip()
                         if not text:
                             continue
-                        
+
                         orig_x = cx1 + int(ocr_data["left"][i] / scale)
                         orig_y = cy1 + int(ocr_data["top"][i] / scale)
                         orig_w = int(ocr_data["width"][i] / scale)
                         orig_h = int(ocr_data["height"][i] / scale)
-                        
+
                         token_info = {"text": text, "x": orig_x, "y": orig_y, "w": orig_w, "h": orig_h}
                         line_id = (ocr_data["block_num"][i], ocr_data["par_num"][i], ocr_data["line_num"][i])
                         if line_id not in current_lines:
@@ -365,20 +362,16 @@ class PresidioPIIEngine:
             except Exception as ocr_err:
                 logger.warning(f"Pyramid OCR execution notice: {ocr_err}")
 
-            fill_color = (15, 23, 42)
-            border_color = (239, 68, 68)
-            text_color = (248, 250, 252)
-
             for x1, y1, x2, y2, label in redaction_boxes:
-                draw.rectangle([x1, y1, x2, y2], fill=fill_color, outline=border_color, width=2)
+                draw.rectangle([x1, y1, x2, y2], fill=REDACTION_FILL_COLOR, outline=REDACTION_BORDER_COLOR, width=2)
                 tag_text = f"[REDACTED: {label}]"
                 text_y = y1 + max(1, (y2 - y1 - 8) // 2)
-                draw.text((x1 + 4, text_y), tag_text, fill=text_color, font=font)
+                draw.text((x1 + 4, text_y), tag_text, fill=REDACTION_TEXT_COLOR, font=font)
 
             banner_height = max(24, int(height * 0.04))
-            draw.rectangle([0, 0, width, banner_height], fill=(16, 185, 129))
+            draw.rectangle([0, 0, width, banner_height], fill=BANNER_BG_COLOR)
             banner_text = "PRESIDIO 2-STREAM OCR REDACTOR - NGHI DINH 13/2023/ND-CP COMPLIANT"
-            draw.text((10, max(4, (banner_height - 10) // 2)), banner_text, fill=(255, 255, 255), font=font)
+            draw.text((10, max(4, (banner_height - 10) // 2)), banner_text, fill=BANNER_TEXT_COLOR, font=font)
 
             buffered = io.BytesIO()
             image.save(buffered, format="PNG")
@@ -412,4 +405,3 @@ class PresidioPIIEngine:
 
 
 presidio_engine = PresidioPIIEngine()
-

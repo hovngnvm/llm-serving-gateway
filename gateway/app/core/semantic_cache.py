@@ -7,11 +7,17 @@ Bypasses vLLM serving and returns sub-5ms responses for repeated queries (>0.95 
 import json
 import math
 import hashlib
+import time
 from typing import Any
+import redis.asyncio as aioredis
 from gateway.app.config import settings
 from gateway.app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+MAX_MEMORY_CACHE_ENTRIES = 1000
+REDIS_CONNECT_COOLDOWN_SECONDS = 10.0
+VECTOR_DIMENSION = 128
 
 
 class SemanticPromptCache:
@@ -19,14 +25,17 @@ class SemanticPromptCache:
         self.threshold = settings.semantic_cache_threshold
         self.ttl = settings.semantic_cache_ttl_seconds
         self.redis_client: Any = None
+        self._last_redis_fail_time: float = 0.0
         self.hit_count = 0
         self.miss_count = 0
         self._memory_cache: dict[str, dict[str, Any]] = {}
 
     async def get_client(self) -> Any:
+        now = time.monotonic()
         if self.redis_client is None:
+            if now - self._last_redis_fail_time < REDIS_CONNECT_COOLDOWN_SECONDS:
+                return None
             try:
-                import redis.asyncio as aioredis
                 client = aioredis.Redis(
                     host=settings.redis_host,
                     port=settings.redis_port,
@@ -38,11 +47,12 @@ class SemanticPromptCache:
                 await client.ping()
                 self.redis_client = client
             except Exception as e:
+                self._last_redis_fail_time = now
                 logger.debug(f"Redis cache not reachable ({e}). Using in-memory vector cache.")
                 return None
         return self.redis_client
 
-    def _simple_text_vector(self, text: str, dim: int = 128) -> list[float]:
+    def _simple_text_vector(self, text: str, dim: int = VECTOR_DIMENSION) -> list[float]:
         """Generates a fast, normalized n-gram hash vector for prompt similarity comparisons."""
         vec = [0.0] * dim
         words = text.lower().strip().split()
@@ -50,7 +60,7 @@ class SemanticPromptCache:
             return vec
 
         for word in words:
-            idx = int(hashlib.md5(word.encode("utf-8")).hexdigest(), 16) % dim
+            idx = int(hashlib.sha256(word.encode("utf-8")).hexdigest(), 16) % dim
             vec[idx] += 1.0
 
         norm = math.sqrt(sum(x * x for x in vec))
@@ -60,7 +70,7 @@ class SemanticPromptCache:
 
     def _cosine_similarity(self, vec_a: list[float], vec_b: list[float]) -> float:
         """Computes Cosine Similarity between two normalized vectors."""
-        if len(vec_a) != len(vec_b):
+        if len(vec_a) != len(vec_b) or not vec_a:
             return 0.0
         dot_product = sum(a * b for a, b in zip(vec_a, vec_b))
         return max(0.0, min(1.0, dot_product))
@@ -72,29 +82,28 @@ class SemanticPromptCache:
         try:
             client = await self.get_client()
             if client:
-                keys = await client.keys("semcache:*")
-                best_match_key = None
-                best_similarity = 0.0
+                keys = []
+                async for key in client.scan_iter("semcache:*", count=100):
+                    keys.append(key)
 
-                for key in keys:
-                    cached_raw = await client.get(key)
-                    if not cached_raw:
-                        continue
-                    cached_item = json.loads(cached_raw)
-                    cached_vec = cached_item.get("vector", [])
+                if keys:
+                    values = await client.mget(keys)
+                    best_match_payload = None
+                    best_similarity = 0.0
 
-                    sim = self._cosine_similarity(query_vec, cached_vec)
-                    if sim > best_similarity:
-                        best_similarity = sim
-                        best_match_key = key
+                    for raw_val in values:
+                        if not raw_val:
+                            continue
+                        cached_item = json.loads(raw_val)
+                        sim = self._cosine_similarity(query_vec, cached_item.get("vector", []))
+                        if sim > best_similarity:
+                            best_similarity = sim
+                            best_match_payload = cached_item.get("payload")
 
-                if best_similarity >= self.threshold and best_match_key:
-                    cached_raw = await client.get(best_match_key)
-                    if cached_raw:
-                        cached_item = json.loads(cached_raw)
+                    if best_similarity >= self.threshold and best_match_payload is not None:
                         self.hit_count += 1
                         logger.info(f"Redis Semantic Cache Hit! Cosine Sim: {best_similarity:.4f}")
-                        return cached_item.get("payload")
+                        return best_match_payload
         except Exception as e:
             logger.debug(f"Redis get error: {e}")
 
@@ -125,6 +134,11 @@ class SemanticPromptCache:
             "vector": vector,
             "payload": payload,
         }
+
+        # Memory Cache LRU eviction if oversized
+        if len(self._memory_cache) >= MAX_MEMORY_CACHE_ENTRIES:
+            oldest_key = next(iter(self._memory_cache))
+            del self._memory_cache[oldest_key]
 
         self._memory_cache[cache_key] = cache_entry
 

@@ -5,10 +5,15 @@ Asynchronously logs sanitized, PII-masked compliance records for PCI-DSS & SBV c
 
 import json
 from typing import Any
+import asyncpg
 from gateway.app.config import settings
 from gateway.app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+DB_POOL_MIN_SIZE = 1
+DB_POOL_MAX_SIZE = 5
+DB_CONNECT_TIMEOUT = 10.0
 
 
 class NeonAuditLogger:
@@ -18,20 +23,19 @@ class NeonAuditLogger:
         self._table_initialized = False
 
     async def get_pool(self) -> Any:
+        if not self.db_url:
+            return None
+
         if self.pool is None:
             try:
-                import asyncpg
                 self.pool = await asyncpg.create_pool(
                     dsn=self.db_url,
-                    min_size=1,
-                    max_size=5,
-                    timeout=10.0,
+                    min_size=DB_POOL_MIN_SIZE,
+                    max_size=DB_POOL_MAX_SIZE,
+                    timeout=DB_CONNECT_TIMEOUT,
                     ssl="require",
                 )
                 logger.info("Connected to Neon Serverless PostgreSQL Cloud Pool.")
-            except ImportError:
-                logger.debug("asyncpg driver not installed in current environment. Using simulated audit logger.")
-                return None
             except Exception as e:
                 logger.warning(f"Unable to connect to Neon PostgreSQL: {e}")
                 return None
@@ -39,7 +43,7 @@ class NeonAuditLogger:
 
     async def init_db(self) -> None:
         """Initializes the audit_logs table if not exists."""
-        if self._table_initialized:
+        if self._table_initialized or not self.db_url:
             return
 
         pool = await self.get_pool()
@@ -70,8 +74,6 @@ class NeonAuditLogger:
                 logger.info("Neon PostgreSQL audit_logs table verified successfully.")
         except Exception as e:
             logger.warning(f"Failed to initialize audit_logs table: {e}")
-
-    init_table = init_db
 
     async def log_request(
         self,
