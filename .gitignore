@@ -25,3 +25,6 @@ htmlcov/
 # Prometheus runtime secrets
 prometheus/*password*.txt
 
+
+CODEX_ADVERSARIAL_REVIEW.md
+docs/

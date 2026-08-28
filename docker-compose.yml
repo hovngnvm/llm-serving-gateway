@@ -10,6 +10,9 @@ services:
     environment:
       - REDIS_HOST=redis-cache
       - VLLM_BASE_URL=http://vllm-server:8000/v1
+    volumes:
+      - ./artifacts:/app/artifacts
+      - ./logs:/app/logs
     ports:
       - "8080:8080"
     depends_on:
@@ -23,11 +26,11 @@ services:
 
   # 2. Local LLM Inference Serving Host (Optional OpenAI-Compatible Host)
   vllm-server:
-    image: vllm/vllm-openai:gemma4-cu130
+    image: vllm/vllm-openai:v0.6.3.post1
     container_name: vllm-server
     runtime: nvidia
     environment:
-      - HF_TOKEN=${HF_TOKEN:-${HUGGING_FACE_HUB_TOKEN:-}}
+      - HF_TOKEN=${HF_TOKEN:-}
       - VLLM_LOGGING_LEVEL=INFO
       - VLLM_WORKER_MULTIPROC_METHOD=spawn
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True

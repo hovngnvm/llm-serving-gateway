@@ -4,7 +4,7 @@ version: "1.0.0"
 seed: 42
 
 model:
-  base_model_name: null
+  base_model_name: "Qwen/Qwen2.5-0.5B-Instruct"
   torch_dtype: "bfloat16"
   max_seq_length: 1024
   trust_remote_code: true

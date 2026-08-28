@@ -36,7 +36,7 @@ def run_pipeline(config_path: str, mode: str = "smoke-test", target_stage: int =
     logger.info(f"Loaded config: {config.pipeline_name} (Base Model: {config.model.base_model_name})")
 
     # Stage 1: Dataset Canonicalization & PII Audit
-    logger.info("=== [Stage 1/3]: Dataset Canonicalization, Dedup & PII Audit ===")
+    logger.info("[Stage 1/3] Dataset Canonicalization, Dedup & PII Audit started")
     validator = DatasetValidator(config.dataset, seed=config.seed)
     dataset_report = validator.process()
     logger.info(
@@ -50,7 +50,7 @@ def run_pipeline(config_path: str, mode: str = "smoke-test", target_stage: int =
     val_path = dataset_report["artifacts"]["val_file"]
 
     # Stage 2: SFT / QLoRA Engine
-    logger.info(f"=== [Stage 2/3]: SFT / QLoRA Engine ({mode.upper()}) ===")
+    logger.info(f"[Stage 2/3] SFT / QLoRA Engine ({mode.upper()}) started")
     train_engine = TrainEngine(config)
     if mode == "dry-run":
         dry_run_report = train_engine.execute_dry_run(train_path)
@@ -67,7 +67,7 @@ def run_pipeline(config_path: str, mode: str = "smoke-test", target_stage: int =
         return
 
     # Stage 3: Offline Model Evaluation & Manifest Packaging
-    logger.info("=== [Stage 3/3]: Offline Model Evaluation & Manifest Packaging ===")
+    logger.info("[Stage 3/3] Offline Model Evaluation & Manifest Packaging started")
     eval_engine = EvalEngine(config)
     eval_report = eval_engine.evaluate(val_path, adapter_path=train_report["adapter_dir"])
     lora_res = eval_report["benchmark_results"]["lora_adapter"]
@@ -84,7 +84,7 @@ def run_pipeline(config_path: str, mode: str = "smoke-test", target_stage: int =
     )
 
     elapsed = round(time.time() - t_start, 2)
-    logger.info(f"PIPELINE COMPLETED SUCCESSFULLY IN {elapsed}s!")
+    logger.info(f"Pipeline execution completed successfully in {elapsed}s.")
     logger.info(f"Artifacts and manifest ready in: {config.training.output_dir}")
 
 
