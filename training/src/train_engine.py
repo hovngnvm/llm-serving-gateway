@@ -8,17 +8,23 @@ import json
 import time
 from pathlib import Path
 from typing import Any
-from training.src.config_schema import PipelineConfig, PROJECT_ROOT
+from huggingface_hub import hf_hub_download
+from training.src.config_schema import PipelineConfig
+from training.src.utils.paths import PROJECT_ROOT, resolve_path, to_portable_path
 from training.src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+VRAM_4BIT_COEFFICIENT = 0.5
+VRAM_LORA_STATE_MULTIPLIER = 16
+CUDA_OVERHEAD_GB = 0.55
+BYTES_PER_GB = 1024 ** 3
 
 
 class TrainEngine:
     def __init__(self, config: PipelineConfig) -> None:
         self.config = config
-        out_dir = Path(config.training.output_dir)
-        self.output_dir = out_dir if out_dir.is_absolute() else PROJECT_ROOT / out_dir
+        self.output_dir = resolve_path(config.training.output_dir)
         self.adapter_dir = self.output_dir / "adapter"
 
     def inspect_model_architecture(self, model_name: str) -> dict[str, Any]:
@@ -41,7 +47,6 @@ class TrainEngine:
 
         if cfg_data is None:
             try:
-                from huggingface_hub import hf_hub_download
                 try:
                     cfg_file = hf_hub_download(repo_id=model_name, filename="config.json", local_files_only=True)
                     source = f"huggingface_hub (local cache: {model_name})"
@@ -88,11 +93,7 @@ class TrainEngine:
         Model-agnostic across any architecture (Qwen, Llama, Mistral, Gemma, DeepSeek).
         """
         logger.info("Executing Stage 2: Dynamic Model-Agnostic Dry-Run Validation...")
-        train_file = Path(train_path)
-        if not train_file.is_absolute() and not train_file.exists():
-            fallback_train = PROJECT_ROOT / train_path
-            if fallback_train.exists():
-                train_file = fallback_train
+        train_file = resolve_path(train_path)
 
         if not train_file.exists():
             raise FileNotFoundError(f"Processed training file not found: {train_path}")
@@ -114,15 +115,14 @@ class TrainEngine:
         trainable_params = 2 * r * arch["hidden_size"] * arch["num_hidden_layers"] * target_count
         trainable_pct = round((trainable_params / arch["total_params"]) * 100, 4)
 
-        base_vram_gb = (arch["total_params"] * 0.5) / (1024**3)
-        lora_vram_gb = (trainable_params * 16) / (1024**3)
-        
+        base_vram_gb = (arch["total_params"] * VRAM_4BIT_COEFFICIENT) / BYTES_PER_GB
+        lora_vram_gb = (trainable_params * VRAM_LORA_STATE_MULTIPLIER) / BYTES_PER_GB
+
         head_dim = arch["hidden_size"] // max(1, arch["num_attention_heads"])
         kv_cache_bytes = 2 * arch["num_hidden_layers"] * arch["num_attention_heads"] * head_dim * self.config.model.max_seq_length * self.config.training.per_device_train_batch_size * 2
-        kv_cache_gb = kv_cache_bytes / (1024**3)
-        
-        cuda_overhead_gb = 0.55
-        estimated_vram_gb = round(base_vram_gb + lora_vram_gb + kv_cache_gb + cuda_overhead_gb, 2)
+        kv_cache_gb = kv_cache_bytes / BYTES_PER_GB
+
+        estimated_vram_gb = round(base_vram_gb + lora_vram_gb + kv_cache_gb + CUDA_OVERHEAD_GB, 2)
 
         if estimated_vram_gb <= 5.8:
             hardware_compat = "Compatible with 6GB VRAM GPUs (e.g. RTX 3060/4050 Laptop)"
@@ -202,7 +202,7 @@ class TrainEngine:
             "initial_loss": initial_loss,
             "final_loss": final_loss,
             "training_time_seconds": duration_sec,
-            "adapter_dir": str(self.adapter_dir),
+            "adapter_dir": to_portable_path(self.adapter_dir),
             "device": "cpu",
         }
 
@@ -215,4 +215,3 @@ class TrainEngine:
         """Executes SFT QLoRA training run."""
         logger.info("Executing Stage 2: Full SFT QLoRA Training...")
         return self.execute_smoke_test(train_path)
-

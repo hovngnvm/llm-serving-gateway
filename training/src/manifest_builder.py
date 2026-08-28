@@ -8,17 +8,21 @@ import subprocess
 import time
 from pathlib import Path
 from typing import Any
-from training.src.config_schema import PipelineConfig, PROJECT_ROOT
+from training.src.config_schema import PipelineConfig
+from training.src.utils.paths import PROJECT_ROOT, resolve_path, to_portable_path
 from training.src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+GIT_TIMEOUT_SECONDS = 3
+MANIFEST_SCHEMA_URL = "https://enterprise-ai.platform/schemas/manifest-v1.json"
+MANIFEST_VERSION = "1.0.0"
 
 
 class ManifestBuilder:
     def __init__(self, config: PipelineConfig) -> None:
         self.config = config
-        out_dir = Path(config.training.output_dir)
-        self.output_dir = out_dir if out_dir.is_absolute() else PROJECT_ROOT / out_dir
+        self.output_dir = resolve_path(config.training.output_dir)
 
     def get_git_commit_sha(self) -> str:
         """Retrieves active Git commit SHA or fallback."""
@@ -28,7 +32,7 @@ class ManifestBuilder:
                 capture_output=True,
                 text=True,
                 check=True,
-                timeout=3,
+                timeout=GIT_TIMEOUT_SECONDS,
             )
             return res.stdout.strip()
         except Exception:
@@ -48,13 +52,13 @@ class ManifestBuilder:
 
         artifacts_inventory = {
             "adapter_model": {
-                "path": str(adapter_path),
+                "path": to_portable_path(adapter_path),
                 "is_present": adapter_path.exists(),
                 "format": "PEFT LoRA Adapter (BF16)",
                 "recommended_for": "Dynamic Multi-LoRA Gateway Serving",
             },
             "evaluation_report": {
-                "path": str(eval_path),
+                "path": to_portable_path(eval_path),
                 "is_present": eval_path.exists(),
             },
         }
@@ -63,8 +67,8 @@ class ManifestBuilder:
         lora_eval = benchmarks.get("lora_adapter", {})
 
         manifest = {
-            "$schema": "https://enterprise-ai.platform/schemas/manifest-v1.json",
-            "manifest_version": "1.0.0",
+            "$schema": MANIFEST_SCHEMA_URL,
+            "manifest_version": MANIFEST_VERSION,
             "pipeline_name": self.config.pipeline_name,
             "created_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "lineage": {

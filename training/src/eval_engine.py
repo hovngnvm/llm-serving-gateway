@@ -10,10 +10,17 @@ import time
 from pathlib import Path
 from typing import Any
 import httpx
-from training.src.config_schema import PipelineConfig, PROJECT_ROOT
+from training.src.config_schema import PipelineConfig
+from training.src.utils.paths import PROJECT_ROOT, resolve_path
 from training.src.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+PROBE_TIMEOUT_SECONDS = 2.0
+QUERY_TIMEOUT_SECONDS = 15.0
+DEFAULT_MAX_EVAL_TOKENS = 256
+COMPLIANCE_THRESHOLD = 0.70
+FLOAT_EQUALS_EPSILON = 1e-3
 
 
 class EvalEngine:
@@ -24,14 +31,13 @@ class EvalEngine:
     ) -> None:
         self.config = config
         self.endpoint_url = endpoint_url or os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
-        out_dir = Path(config.training.output_dir)
-        self.output_dir = out_dir if out_dir.is_absolute() else PROJECT_ROOT / out_dir
+        self.output_dir = resolve_path(config.training.output_dir)
         self.eval_dir = self.output_dir / "eval"
 
     def probe_live_server(self) -> bool:
         """Checks if the live inference server (vLLM / Gateway) is reachable."""
         try:
-            with httpx.Client(timeout=2.0) as client:
+            with httpx.Client(timeout=PROBE_TIMEOUT_SECONDS) as client:
                 res = client.get(f"{self.endpoint_url}/models")
                 return res.status_code == 200
         except Exception:
@@ -58,12 +64,12 @@ class EvalEngine:
             "model": target_model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": 256,
+            "max_tokens": DEFAULT_MAX_EVAL_TOKENS,
         }
 
         t_start = time.perf_counter()
         try:
-            with httpx.Client(timeout=15.0) as client:
+            with httpx.Client(timeout=QUERY_TIMEOUT_SECONDS) as client:
                 res = client.post(f"{self.endpoint_url}/chat/completions", json=payload)
                 latency_ms = (time.perf_counter() - t_start) * 1000
                 if res.status_code == 200:
@@ -100,7 +106,7 @@ class EvalEngine:
         gt_keys = set(ground_truth.keys())
         parsed_keys = set(parsed.keys())
         matched_keys = gt_keys.intersection(parsed_keys)
-        is_compliant = (len(matched_keys) / max(1, len(gt_keys))) >= 0.70
+        is_compliant = (len(matched_keys) / max(1, len(gt_keys))) >= COMPLIANCE_THRESHOLD
 
         correct_fields = 0
         for k, gt_val in ground_truth.items():
@@ -109,7 +115,7 @@ class EvalEngine:
                 if str(p_val).strip().lower() == str(gt_val).strip().lower():
                     correct_fields += 1
                 elif isinstance(gt_val, (int, float)) and isinstance(p_val, (int, float)):
-                    if abs(float(gt_val) - float(p_val)) < 1e-3:
+                    if abs(float(gt_val) - float(p_val)) < FLOAT_EQUALS_EPSILON:
                         correct_fields += 1
 
         field_acc = correct_fields / max(1, len(gt_keys))
@@ -119,11 +125,7 @@ class EvalEngine:
         """Executes model evaluation over validation dataset records."""
         logger.info("Executing Stage 3: Evaluation Engine (Base Zero-Shot vs LoRA Fine-Tuned)...")
         start_time = time.time()
-        val_file = Path(val_path)
-        if not val_file.is_absolute() and not val_file.exists():
-            fallback_val = PROJECT_ROOT / val_path
-            if fallback_val.exists():
-                val_file = fallback_val
+        val_file = resolve_path(val_path)
 
         if not val_file.exists():
             raise FileNotFoundError(f"Validation dataset not found: {val_path}")
