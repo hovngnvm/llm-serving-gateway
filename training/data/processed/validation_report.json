@@ -4,8 +4,8 @@
   "raw_dataset_sha256": "a95d326e89cd4f9b9996df063760933d084fd6f0862d5b06859077d0bb939a66",
   "raw_sample_count": 12,
   "deduped_sample_count": 12,
-  "train_sample_count": 10,
-  "val_sample_count": 2,
+  "train_sample_count": 11,
+  "val_sample_count": 1,
   "calibration_sample_count": 128,
   "pii_audit_counts": {
     "CITIZEN_ID": 10,
