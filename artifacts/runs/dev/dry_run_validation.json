@@ -12,8 +12,8 @@
     "vocab_size": 151936,
     "num_attention_heads": 14
   },
-  "sample_count": 10,
-  "estimated_token_count": 2104,
+  "sample_count": 11,
+  "estimated_token_count": 2305,
   "max_seq_length": 1024,
   "total_parameters": 526991360,
   "trainable_parameters": 4816896,

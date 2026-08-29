@@ -4,6 +4,6 @@
   "initial_loss": 2.45,
   "final_loss": 1.825,
   "training_time_seconds": 0.0,
-  "adapter_dir": "\\\\wsl.localhost\\Ubuntu\\home\\d1ego23\\PRJCT\\GATEWAY\\artifacts\\runs\\dev\\adapter",
+  "adapter_dir": "artifacts/runs/dev/adapter",
   "device": "cpu"
 }
