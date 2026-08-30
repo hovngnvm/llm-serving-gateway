@@ -264,7 +264,9 @@ GATEWAY/
 │   ├── Dockerfile                     # Gateway containerization manifest
 │   └── app/
 │       ├── main.py                    # FastAPI application entrypoint & routing endpoints
-│       ├── config.py                  # Pydantic settings & auto-bootstrapping runtime directories
+│       ├── config/
+│       │   ├── __init__.py
+│       │   └── settings.py            # Pydantic BaseSettings & auto-bootstrapping runtime directories
 │       │
 │       ├── core/                      # Gateway core security & optimization engines
 │       │   ├── presidio_engine.py     # Microsoft Presidio PII redaction filter (17 entity types)

@@ -5,18 +5,21 @@ Verifies system health endpoints, audit logging schema, and docker-compose servi
 
 import unittest
 from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-from gateway.app.core.semantic_cache import semantic_cache
-from gateway.app.core.output_validator import output_validator
+from fastapi.testclient import TestClient
+from gateway.app.main import app
 from gateway.app.db.neon_audit_logger import neon_audit_logger
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class TestHealthAndObservability(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.client = TestClient(app)
+
     def test_docker_compose_core_services(self) -> None:
         """Verifies docker-compose contains core application services."""
-        compose_path = BASE_DIR / "docker-compose.yml"
+        compose_path = PROJECT_ROOT / "docker-compose.yml"
         self.assertTrue(compose_path.exists())
         content = compose_path.read_text(encoding="utf-8")
 
@@ -24,31 +27,32 @@ class TestHealthAndObservability(unittest.TestCase):
         self.assertIn("redis-cache:", content)
         self.assertIn("prometheus:", content)
 
-        prom_cfg = BASE_DIR / "prometheus" / "prometheus.yml"
+        prom_cfg = PROJECT_ROOT / "prometheus" / "prometheus.yml"
         self.assertTrue(prom_cfg.exists())
         self.assertIn("ai-gateway", prom_cfg.read_text(encoding="utf-8"))
 
-    def test_gateway_health_metrics_structure(self) -> None:
-        """Verifies internal observability counters and health stats."""
-        stats = {
-            "status": "healthy",
-            "semantic_cache": {
-                "hits": semantic_cache.hit_count,
-                "misses": semantic_cache.miss_count,
-            },
-            "schema_validations": output_validator.validation_count,
-            "json_auto_repairs": output_validator.auto_repair_count,
-        }
-        self.assertEqual(stats["status"], "healthy")
-        self.assertIn("hits", stats["semantic_cache"])
-        self.assertIn("misses", stats["semantic_cache"])
-        self.assertGreaterEqual(stats["schema_validations"], 0)
-        self.assertGreaterEqual(stats["json_auto_repairs"], 0)
+    def test_gateway_health_endpoint_response(self) -> None:
+        """Verifies real /health endpoint returns healthy status and metric counters."""
+        resp = self.client.get("/health")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data.get("status"), "healthy")
+        self.assertIn("semantic_cache", data)
+        self.assertIn("hits", data["semantic_cache"])
+        self.assertIn("misses", data["semantic_cache"])
+        self.assertIn("schema_validations", data)
+        self.assertIn("json_auto_repairs", data)
+
+    def test_prometheus_metrics_endpoint_response(self) -> None:
+        """Verifies Prometheus metrics endpoint is exposed and scraped successfully."""
+        resp = self.client.get("/metrics")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("http_request", resp.text)
 
     def test_audit_logger_schema_contract(self) -> None:
         """Verifies Neon PostgreSQL audit logger schema query definition."""
-        self.assertTrue(hasattr(neon_audit_logger, "log_request"))
-        self.assertTrue(hasattr(neon_audit_logger, "init_db"))
+        self.assertTrue(callable(getattr(neon_audit_logger, "log_request", None)))
+        self.assertTrue(callable(getattr(neon_audit_logger, "init_db", None)))
 
 
 if __name__ == "__main__":

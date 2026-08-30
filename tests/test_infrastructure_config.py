@@ -3,15 +3,15 @@ Unit & Sanity test for infrastructure configuration files.
 Verifies docker-compose syntax, environment variable loading, and parameters.
 """
 
-import unittest
 from pathlib import Path
+import unittest
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class TestInfrastructureConfig(unittest.TestCase):
     def test_docker_compose_exists(self) -> None:
-        compose_path = BASE_DIR / "docker-compose.yml"
+        compose_path = PROJECT_ROOT / "docker-compose.yml"
         self.assertTrue(compose_path.exists(), "docker-compose.yml must exist")
         content = compose_path.read_text(encoding="utf-8")
         self.assertIn("Qwen/Qwen2.5-0.5B-Instruct", content)
@@ -21,7 +21,7 @@ class TestInfrastructureConfig(unittest.TestCase):
         self.assertIn("redis/redis-stack:latest", content)
 
     def test_env_example_exists(self) -> None:
-        env_path = BASE_DIR / ".env.example"
+        env_path = PROJECT_ROOT / ".env.example"
         self.assertTrue(env_path.exists(), ".env.example must exist")
         content = env_path.read_text(encoding="utf-8")
         self.assertIn("VLLM_BASE_URL", content)
@@ -30,7 +30,7 @@ class TestInfrastructureConfig(unittest.TestCase):
         self.assertIn("HF_TOKEN", content)
 
     def test_requirements_file_valid(self) -> None:
-        req_path = BASE_DIR / "requirements.txt"
+        req_path = PROJECT_ROOT / "requirements.txt"
         self.assertTrue(req_path.exists(), "requirements.txt must exist at root")
         content = req_path.read_text(encoding="utf-8")
         self.assertIn("fastapi", content)

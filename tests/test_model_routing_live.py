@@ -5,6 +5,7 @@ Verifies offline rule routing and live gateway endpoints.
 
 import unittest
 import httpx
+import pytest
 
 from gateway.app.config import settings
 from gateway.app.core.intent_router import intent_router
@@ -21,6 +22,7 @@ class TestModelRouting(unittest.TestCase):
         self.assertEqual(decision_explicit["target_model"], "financial_adapter")
         self.assertEqual(decision_explicit["routing_strategy"], "client_explicit")
 
+    @pytest.mark.live
     def test_model_auto_routing_live(self) -> None:
         """Tests live endpoint routing if gateway is online, otherwise skips gracefully."""
         cases = [
@@ -30,8 +32,9 @@ class TestModelRouting(unittest.TestCase):
             ("financial_adapter", "Xin chào bạn là ai"),
         ]
 
+        target_url = f"http://{settings.gateway_host}:{settings.gateway_port}"
         try:
-            with httpx.Client(base_url="http://localhost:8080", timeout=2.0) as client:
+            with httpx.Client(base_url=target_url, timeout=2.0) as client:
                 health_resp = client.get("/health")
                 if health_resp.status_code != 200:
                     raise unittest.SkipTest("Gateway health endpoint returned non-200")
@@ -48,7 +51,7 @@ class TestModelRouting(unittest.TestCase):
                     )
                     self.assertIn(res.status_code, [200, 503])
         except (httpx.ConnectError, httpx.TimeoutException):
-            raise unittest.SkipTest("Gateway server is not running on localhost:8080")
+            raise unittest.SkipTest(f"Gateway server is not running on {target_url}")
 
 
 if __name__ == "__main__":
