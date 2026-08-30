@@ -4,7 +4,6 @@ Verifies all 17 legal entity recognizers (Basic & Sensitive Personal Data) and S
 """
 
 import unittest
-
 from gateway.app.core.presidio_engine import presidio_engine
 
 
@@ -18,7 +17,7 @@ class TestDecree13PIIEngine(unittest.TestCase):
             "Email: test@company.com, IP: 192.168.1.1, MAC: 00:1A:2B:3C:4D:5E."
         )
         masked, mapping, count = presidio_engine.mask_text(prompt)
-        
+
         self.assertGreaterEqual(count, 10)
         self.assertIn("<CITIZEN_ID_1>", masked)
         self.assertIn("<PASSPORT_VN_1>", masked)
@@ -66,18 +65,16 @@ class TestDecree13PIIEngine(unittest.TestCase):
         """Ensures OCR placeholders use OCR_ prefix and do not overwrite prompt PII tokens."""
         prompt = "Khách hàng CCCD 079123456789"
         masked_prompt, prompt_mapping, _ = presidio_engine.mask_text(prompt)
-        
+
         # Simulate OCR text containing another citizen ID
         ocr_raw = "Hóa đơn đính kèm CCCD 001987654321"
-        _, ocr_masked, ocr_mapping, _ = presidio_engine.process_multimodal_ocr("")
-        # Directly test the namespace logic with simulated OCR extraction
         raw_ocr_masked, raw_ocr_map, _ = presidio_engine.mask_text(ocr_raw)
         ocr_prefixed_map = {f"<OCR_{k[1:]}": v for k, v in raw_ocr_map.items()}
-        
+
         # Merge mappings
         combined_mapping = dict(prompt_mapping)
         combined_mapping.update(ocr_prefixed_map)
-        
+
         # Verify both tokens exist independently without key collision
         self.assertIn("<CITIZEN_ID_1>", combined_mapping)
         self.assertIn("<OCR_CITIZEN_ID_1>", combined_mapping)
@@ -87,4 +84,3 @@ class TestDecree13PIIEngine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

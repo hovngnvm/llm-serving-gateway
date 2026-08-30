@@ -3,23 +3,22 @@ Automated Test Suite for Foundation Model Adaptation & Evaluation Pipeline.
 Tests configuration schema, dataset validation & PII audit, SFT/QLoRA dry-run/smoke-test, evaluation, and manifest contract.
 """
 
-import unittest
 from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent.parent
+import unittest
 
 from training.src.config_schema import load_pipeline_config
 from training.src.dataset_validator import DatasetValidator
 from training.src.train_engine import TrainEngine
 from training.src.eval_engine import EvalEngine
 from training.src.manifest_builder import ManifestBuilder
+from training.src.utils.paths import PROJECT_ROOT
 from training.run_pipeline import run_pipeline
 
 
 class TestFoundationModelPipeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.dev_config_path = str(BASE_DIR / "training" / "configs" / "dev.yaml")
+        cls.dev_config_path = str(PROJECT_ROOT / "training" / "configs" / "dev.yaml")
         cls.config = load_pipeline_config(cls.dev_config_path)
 
     def test_config_schema_validation(self) -> None:
@@ -39,8 +38,8 @@ class TestFoundationModelPipeline(unittest.TestCase):
         self.assertEqual(report["status"], "success")
         self.assertGreater(report["train_sample_count"], 0)
         self.assertGreater(report["val_sample_count"], 0)
-        self.assertTrue(Path(report["artifacts"]["train_file"]).exists())
-        self.assertTrue(Path(report["artifacts"]["val_file"]).exists())
+        self.assertTrue((PROJECT_ROOT / report["artifacts"]["train_file"]).exists())
+        self.assertTrue((PROJECT_ROOT / report["artifacts"]["val_file"]).exists())
 
         pii_counts = report["pii_audit_counts"]
         self.assertIsInstance(pii_counts, dict)
@@ -50,7 +49,7 @@ class TestFoundationModelPipeline(unittest.TestCase):
     def test_train_engine_dry_run(self) -> None:
         """Validates mathematical graph verification and VRAM estimation."""
         train_engine = TrainEngine(self.config)
-        train_path = str(BASE_DIR / "training/data/processed/train.jsonl")
+        train_path = str(PROJECT_ROOT / "training" / "data" / "processed" / "train.jsonl")
         dry_run = train_engine.execute_dry_run(train_path)
 
         self.assertEqual(dry_run["status"], "passed")
@@ -62,20 +61,20 @@ class TestFoundationModelPipeline(unittest.TestCase):
     def test_train_engine_smoke_test(self) -> None:
         """Validates gradient flow and adapter artifact generation."""
         train_engine = TrainEngine(self.config)
-        train_path = str(BASE_DIR / "training/data/processed/train.jsonl")
+        train_path = str(PROJECT_ROOT / "training" / "data" / "processed" / "train.jsonl")
         smoke_res = train_engine.execute_smoke_test(train_path)
 
         self.assertEqual(smoke_res["status"], "success")
         self.assertLess(smoke_res["final_loss"], smoke_res["initial_loss"])
 
-        adapter_dir = Path(smoke_res["adapter_dir"])
+        adapter_dir = PROJECT_ROOT / smoke_res["adapter_dir"]
         self.assertTrue((adapter_dir / "adapter_config.json").exists())
         self.assertTrue((adapter_dir / "adapter_model.bin").exists())
 
     def test_eval_engine_metrics(self) -> None:
         """Validates model evaluation comparing Base vs LoRA."""
         eval_engine = EvalEngine(self.config)
-        val_path = str(BASE_DIR / "training/data/processed/val.jsonl")
+        val_path = str(PROJECT_ROOT / "training" / "data" / "processed" / "val.jsonl")
         eval_res = eval_engine.evaluate(val_path)
 
         self.assertEqual(eval_res["status"], "success")
@@ -83,7 +82,7 @@ class TestFoundationModelPipeline(unittest.TestCase):
 
         base_validity = benchmarks["base_zero_shot"]["json_validity_rate"]
         lora_validity = benchmarks["lora_adapter"]["json_validity_rate"]
-        self.assertGreaterEqual(lora_validity, 0.0)
+        self.assertGreater(lora_validity, 0.0)
         self.assertGreaterEqual(base_validity, 0.0)
 
         lora_lat = benchmarks["lora_adapter"]["avg_latency_ms"]
