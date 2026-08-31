@@ -1,7 +1,7 @@
 {
   "status": "success",
   "execution_mode": "local_deterministic_eval",
-  "evaluation_duration_seconds": 4.41,
+  "evaluation_duration_seconds": 4.466,
   "val_sample_count": 1,
   "evaluated_metrics": [
     "json_validity_rate",
