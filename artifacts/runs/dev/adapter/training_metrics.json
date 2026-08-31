@@ -1,9 +1,18 @@
 {
-  "mode": "smoke-test",
+  "mode": "contract-verification-scaffold",
   "status": "success",
   "initial_loss": 2.45,
   "final_loss": 1.825,
-  "training_time_seconds": 0.0,
+  "duration_seconds": 0.005,
   "adapter_dir": "artifacts/runs/dev/adapter",
-  "device": "cpu"
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "lora_rank": 16
 }
