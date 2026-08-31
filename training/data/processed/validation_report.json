@@ -6,7 +6,6 @@
   "deduped_sample_count": 12,
   "train_sample_count": 11,
   "val_sample_count": 1,
-  "calibration_sample_count": 128,
   "pii_audit_counts": {
     "CITIZEN_ID": 10,
     "CREDIT_CARD": 16,
@@ -17,7 +16,6 @@
   },
   "artifacts": {
     "train_file": "training/data/processed/train.jsonl",
-    "val_file": "training/data/processed/val.jsonl",
-    "calibration_file": "training/data/processed/calibration.jsonl"
+    "val_file": "training/data/processed/val.jsonl"
   }
 }
