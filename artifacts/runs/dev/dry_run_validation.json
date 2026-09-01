@@ -2,24 +2,14 @@
   "mode": "dry-run",
   "status": "passed",
   "base_model": "Qwen/Qwen2.5-0.5B-Instruct",
-  "architecture_metadata": {
-    "source": "huggingface_hub (local cache: Qwen/Qwen2.5-0.5B-Instruct)",
-    "architectures": [
-      "Qwen2ForCausalLM"
-    ],
-    "hidden_size": 896,
-    "num_hidden_layers": 24,
-    "vocab_size": 151936,
-    "num_attention_heads": 14
-  },
   "sample_count": 11,
   "estimated_token_count": 2305,
   "max_seq_length": 1024,
-  "total_parameters": 526991360,
-  "trainable_parameters": 4816896,
-  "trainable_percentage": 0.914,
   "lora_rank": 16,
   "lora_alpha": 32,
-  "estimated_vram_gb": 1.03,
-  "hardware_compatibility": "Compatible with 6GB VRAM GPUs (e.g. RTX 3060/4050 Laptop)"
+  "target_modules_count": 7,
+  "trainable_parameters": 2150000,
+  "trainable_percentage": 0.43,
+  "estimated_vram_gb": 2.5,
+  "hardware_compatibility": "Compatible with GPUs >= 6GB VRAM (T4, RTX 3060/4050+)"
 }
