@@ -1,6 +1,6 @@
 """
 Dataset Validation, Normalization & Security Scanner.
-Converts raw inputs to canonical ChatML, deduplicates, scans PII, and splits data.
+Converts raw inputs to canonical ChatML, deduplicates, scans PII, and splits train/val.
 """
 
 import json
@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import Any
 from training.src.config_schema import DatasetConfig
-from training.src.utils.paths import PROJECT_ROOT, resolve_path, to_portable_path
+from training.src.utils.paths import resolve_path, to_portable_path
 from training.src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -37,39 +37,21 @@ class DatasetValidator:
         }
 
     def canonicalize_to_chatml(self, item: dict[str, Any]) -> dict[str, Any]:
-        """Converts an Alpaca or ShareGPT item into a canonical ChatML format."""
+        """Converts raw dataset items into canonical ChatML format."""
         if "messages" in item and isinstance(item["messages"], list):
             return item
 
-        if "instruction" in item or "input" in item:
-            system_prompt = item.get("instruction", "You are a financial information extraction assistant.")
-            user_content = item.get("input", "")
-            assistant_content = item.get("output", "")
-
-            if isinstance(assistant_content, dict):
-                assistant_content = json.dumps(assistant_content, ensure_ascii=False)
-
-            return {
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                    {"role": "assistant", "content": str(assistant_content)}
-                ]
-            }
-
-        if "conversations" in item and isinstance(item["conversations"], list):
-            messages = []
-            role_map = {"human": "user", "gpt": "assistant", "system": "system"}
-            for turn in item["conversations"]:
-                mapped_role = role_map.get(turn.get("from", "user"), "user")
-                messages.append({"role": mapped_role, "content": turn.get("value", "")})
-            return {"messages": messages}
+        system_prompt = item.get("instruction", "You are a financial information extraction assistant.")
+        user_content = item.get("input", "")
+        assistant_content = item.get("output", "")
+        if isinstance(assistant_content, dict):
+            assistant_content = json.dumps(assistant_content, ensure_ascii=False)
 
         return {
             "messages": [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": str(item)},
-                {"role": "assistant", "content": ""}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+                {"role": "assistant", "content": str(assistant_content)},
             ]
         }
 
@@ -91,7 +73,7 @@ class DatasetValidator:
         return pii_counts
 
     def process(self) -> dict[str, Any]:
-        """Executes full dataset normalization, deduplication, PII scanning, and train/val/calibration splitting."""
+        """Executes dataset normalization, deduplication, PII scanning, and train/val splitting."""
         raw_path = resolve_path(self.config.raw_data_path)
         if not raw_path.exists():
             raise FileNotFoundError(f"Raw dataset not found at: {raw_path}")
@@ -146,18 +128,11 @@ class DatasetValidator:
             train_records = shuffled[:n_train]
             val_records = shuffled[n_train:]
 
-        calib_count = min(self.config.calibration_samples, len(train_records))
-        calibration_records = train_records[:calib_count]
-        if len(calibration_records) < self.config.calibration_samples and train_records:
-            multiplier = (self.config.calibration_samples // len(train_records)) + 1
-            calibration_records = (train_records * multiplier)[:self.config.calibration_samples]
-
         out_dir = resolve_path(self.config.processed_dir)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         train_file = out_dir / "train.jsonl"
         val_file = out_dir / "val.jsonl"
-        calib_file = out_dir / "calibration.jsonl"
         report_file = out_dir / "validation_report.json"
 
         with open(train_file, "w", encoding="utf-8") as f:
@@ -168,10 +143,6 @@ class DatasetValidator:
             for r in val_records:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-        with open(calib_file, "w", encoding="utf-8") as f:
-            for r in calibration_records:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
-
         report = {
             "status": "success",
             "raw_dataset_path": to_portable_path(raw_path),
@@ -180,12 +151,10 @@ class DatasetValidator:
             "deduped_sample_count": len(deduped_records),
             "train_sample_count": len(train_records),
             "val_sample_count": len(val_records),
-            "calibration_sample_count": len(calibration_records),
             "pii_audit_counts": total_pii_stats,
             "artifacts": {
                 "train_file": to_portable_path(train_file),
                 "val_file": to_portable_path(val_file),
-                "calibration_file": to_portable_path(calib_file),
             }
         }
 

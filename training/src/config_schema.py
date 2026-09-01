@@ -13,7 +13,6 @@ class ModelConfig(BaseModel):
     )
     torch_dtype: str = Field(default="bfloat16")
     max_seq_length: int = Field(default=1024, ge=128, le=32768)
-    trust_remote_code: bool = Field(default=True)
 
     @field_validator("base_model_name", mode="before")
     @classmethod
@@ -28,8 +27,6 @@ class DatasetConfig(BaseModel):
     processed_dir: str = Field(default="training/data/processed")
     train_split_ratio: float = Field(default=0.90, gt=0.0, lt=1.0)
     val_split_ratio: float = Field(default=0.10, gt=0.0, lt=1.0)
-    calibration_samples: int = Field(default=128, ge=16)
-    format: str = Field(default="alpaca")
 
     @field_validator("val_split_ratio")
     @classmethod
@@ -52,30 +49,16 @@ class QLoRAConfig(BaseModel):
         ]
     )
     task_type: str = Field(default="CAUSAL_LM")
-    quant_type: str = Field(default="nf4")
-    double_quant: bool = Field(default=True)
 
 
 class TrainingConfig(BaseModel):
     output_dir: str = Field(default="artifacts/runs/dev")
     per_device_train_batch_size: int = Field(default=2, ge=1)
-    gradient_accumulation_steps: int = Field(default=4, ge=1)
     learning_rate: float = Field(default=2.0e-4, gt=0.0)
-    lr_scheduler_type: str = Field(default="cosine")
-    warmup_ratio: float = Field(default=0.05, ge=0.0, le=0.5)
     num_train_epochs: int = Field(default=1, ge=1)
-    max_steps: int = Field(default=-1)
-    logging_steps: int = Field(default=5, ge=1)
-    eval_steps: int = Field(default=25, ge=1)
-    save_steps: int = Field(default=25, ge=1)
-    fp16: bool = Field(default=False)
-    bf16: bool = Field(default=True)
-    gradient_checkpointing: bool = Field(default=True)
-    optim: str = Field(default="paged_adamw_8bit")
 
 
 class EvaluationConfig(BaseModel):
-    batch_size: int = Field(default=4, ge=1)
     metrics: list[str] = Field(
         default_factory=lambda: [
             "json_validity_rate",
