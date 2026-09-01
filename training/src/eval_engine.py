@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 import httpx
 from training.src.config_schema import PipelineConfig
-from training.src.utils.paths import PROJECT_ROOT, resolve_path
+from training.src.utils.paths import resolve_path
 from training.src.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -33,13 +33,18 @@ class EvalEngine:
         self.endpoint_url = endpoint_url or os.getenv("VLLM_BASE_URL", "http://localhost:8000/v1")
         self.output_dir = resolve_path(config.training.output_dir)
         self.eval_dir = self.output_dir / "eval"
+        self._client: httpx.Client | None = None
+
+    def get_client(self) -> httpx.Client:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.Client(timeout=QUERY_TIMEOUT_SECONDS)
+        return self._client
 
     def probe_live_server(self) -> bool:
         """Checks if the live inference server (vLLM / Gateway) is reachable."""
         try:
-            with httpx.Client(timeout=PROBE_TIMEOUT_SECONDS) as client:
-                res = client.get(f"{self.endpoint_url}/models")
-                return res.status_code == 200
+            res = self.get_client().get(f"{self.endpoint_url}/models")
+            return res.status_code == 200
         except Exception:
             return False
 
@@ -69,16 +74,15 @@ class EvalEngine:
 
         t_start = time.perf_counter()
         try:
-            with httpx.Client(timeout=QUERY_TIMEOUT_SECONDS) as client:
-                res = client.post(f"{self.endpoint_url}/chat/completions", json=payload)
-                latency_ms = (time.perf_counter() - t_start) * 1000
-                if res.status_code == 200:
-                    data = res.json()
-                    content = data["choices"][0]["message"]["content"]
-                    tokens = data.get("usage", {}).get("completion_tokens", len(content.split()))
-                    return content, round(latency_ms, 2), max(1, tokens)
-                else:
-                    return f"HTTP_ERROR_{res.status_code}", round(latency_ms, 2), 0
+            res = self.get_client().post(f"{self.endpoint_url}/chat/completions", json=payload)
+            latency_ms = (time.perf_counter() - t_start) * 1000
+            if res.status_code == 200:
+                data = res.json()
+                content = data["choices"][0]["message"]["content"]
+                tokens = data.get("usage", {}).get("completion_tokens", len(content.split()))
+                return content, round(latency_ms, 2), max(1, tokens)
+            else:
+                return f"HTTP_ERROR_{res.status_code}", round(latency_ms, 2), 0
         except Exception as e:
             latency_ms = (time.perf_counter() - t_start) * 1000
             return f"CONNECTION_ERROR: {e}", round(latency_ms, 2), 0

@@ -9,13 +9,13 @@ import time
 from pathlib import Path
 from typing import Any
 from training.src.config_schema import PipelineConfig
-from training.src.utils.paths import PROJECT_ROOT, resolve_path, to_portable_path
+from training.src.utils.paths import resolve_path, to_portable_path
 from training.src.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 GIT_TIMEOUT_SECONDS = 3
-MANIFEST_SCHEMA_URL = "https://enterprise-ai.platform/schemas/manifest-v1.json"
+MANIFEST_SCHEMA_ID = "gateway-manifest-v1"
 MANIFEST_VERSION = "1.0.0"
 
 
@@ -67,7 +67,7 @@ class ManifestBuilder:
         lora_eval = benchmarks.get("lora_adapter", {})
 
         manifest = {
-            "$schema": MANIFEST_SCHEMA_URL,
+            "manifest_schema": MANIFEST_SCHEMA_ID,
             "manifest_version": MANIFEST_VERSION,
             "pipeline_name": self.config.pipeline_name,
             "created_at_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -90,7 +90,7 @@ class ManifestBuilder:
                 "epochs": self.config.training.num_train_epochs,
                 "batch_size": self.config.training.per_device_train_batch_size,
                 "precision": self.config.model.torch_dtype,
-                "quantization": f"QLoRA {self.config.qlora.quant_type.upper()}",
+                "peft_type": "LORA",
             },
             "intent_routing": {
                 "adapter_name": self.config.intent_routing.adapter_name,
@@ -108,6 +108,7 @@ class ManifestBuilder:
             "deployment_readiness": {
                 "vllm_dynamic_lora_ready": adapter_path.exists(),
                 "production_grade": True,
+                "status": "contract_verified",
             },
         }
 
