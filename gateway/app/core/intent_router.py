@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-from gateway.app.config import ARTIFACTS_DIR, PROJECT_ROOT, get_settings
+from gateway.app.config import ARTIFACTS_DIR, get_settings
 from gateway.app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -85,9 +85,7 @@ class IntentRouter:
         """
         artifacts_path = Path(root_artifacts_dir) if root_artifacts_dir else (ARTIFACTS_DIR / "runs")
         if not artifacts_path.exists():
-            artifacts_path = PROJECT_ROOT / "artifacts" / "runs"
-            if not artifacts_path.exists():
-                return 0
+            return 0
 
         discovered_count = 0
         for manifest_file in artifacts_path.glob("**/manifest.json"):
@@ -112,7 +110,6 @@ class IntentRouter:
         self,
         prompt: str,
         requested_model: str | None = None,
-        pii_count: int = 0,
     ) -> dict[str, Any]:
         """Dynamically resolves the target serving model or LoRA adapter."""
         prompt_clean = prompt.strip()
@@ -145,14 +142,6 @@ class IntentRouter:
                         "matched_domain": rule.target_model,
                         "reason": f"Matched domain pattern in prompt -> routed to '{rule.target_model}'.",
                     }
-
-        if pii_count > 0 and "financial_adapter" in self.rules:
-            return {
-                "target_model": "financial_adapter",
-                "routing_strategy": "intent_detected",
-                "matched_domain": "financial_adapter",
-                "reason": f"Detected {pii_count} personal data entities under Decree 13/2023/NĐ-CP.",
-            }
 
         return {
             "target_model": self.default_base_model,

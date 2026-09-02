@@ -22,17 +22,12 @@ logger = get_logger(__name__)
 REDACTION_FILL_COLOR = (15, 23, 42)
 REDACTION_BORDER_COLOR = (239, 68, 68)
 REDACTION_TEXT_COLOR = (248, 250, 252)
-BANNER_BG_COLOR = (16, 185, 129)
-BANNER_TEXT_COLOR = (255, 255, 255)
 MAX_OCR_SCALING_DIM = 1600.0
 
 
 @dataclass(slots=True)
 class EntityDefinition:
     code: str
-    name: str
-    category: str
-    legal_ref: str
     pattern: re.Pattern[str]
     priority: int = 10
 
@@ -41,144 +36,25 @@ class PresidioPIIEngine:
     def __init__(self) -> None:
         self.entities: list[EntityDefinition] = [
             # Sensitive Personal Data (Article 2, Clause 4, Decree 13/2023/ND-CP)
-            EntityDefinition(
-                code="GPS_LOCATION",
-                name="Tọa độ định vị GPS cá nhân",
-                category="SENSITIVE_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 4 Điểm g NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b[-+]?(?:[1-8]?\d(?:\.\d{3,8})|90(?:\.0+)?),\s*[-+]?(?:180(?:\.0+)?|(?:(?:1[0-7]\d)|(?:[1-9]?\d))(?:\.\d{3,8}))\b"),
-                priority=30,
-            ),
-            EntityDefinition(
-                code="CREDIT_CARD",
-                name="Số thẻ tín dụng/ghi nợ",
-                category="SENSITIVE_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 4 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b(?:\d[ -]*?){13,19}\b"),
-                priority=25,
-            ),
-            EntityDefinition(
-                code="BANK_ACCOUNT",
-                name="Số tài khoản ngân hàng",
-                category="SENSITIVE_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 4 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:stk|tài khoản|tk ngân hàng|số tk)[:\s]*([0-9]{8,16})\b"),
-                priority=22,
-            ),
-            EntityDefinition(
-                code="CVV_CVC",
-                name="Mã bảo mật thẻ CVV/CVC",
-                category="SENSITIVE_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 4 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:cvv|cvc|cvv2|cvc2|mã bảo mật)[:\s]*([0-9]{3,4})\b"),
-                priority=22,
-            ),
-            EntityDefinition(
-                code="OTP_PIN",
-                name="Mã xác thực OTP / Mã PIN",
-                category="SENSITIVE_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 4 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:otp|mã pin|pin code|mã xác thực)[:\s]*([0-9]{4,8})\b"),
-                priority=22,
-            ),
-            EntityDefinition(
-                code="MEDICAL_RECORD_ID",
-                name="Mã hồ sơ bệnh án y tế",
-                category="SENSITIVE_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 4 Điểm b NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:ba|hsba|bệnh án|hồ sơ y tế)[:\s]*([a-z0-9-]{6,12})\b"),
-                priority=20,
-            ),
+            EntityDefinition("GPS_LOCATION", re.compile(r"\b[-+]?(?:[1-8]?\d(?:\.\d{3,8})|90(?:\.0+)?),\s*[-+]?(?:180(?:\.0+)?|(?:(?:1[0-7]\d)|(?:[1-9]?\d))(?:\.\d{3,8}))\b"), 30),
+            EntityDefinition("CREDIT_CARD", re.compile(r"\b(?:\d[ -]*?){13,19}\b"), 25),
+            EntityDefinition("BANK_ACCOUNT", re.compile(r"(?i)\b(?:stk|tài khoản|tk ngân hàng|số tk)[:\s]*([0-9]{8,16})\b"), 22),
+            EntityDefinition("CVV_CVC", re.compile(r"(?i)\b(?:cvv|cvc|cvv2|cvc2|mã bảo mật)[:\s]*([0-9]{3,4})\b"), 22),
+            EntityDefinition("OTP_PIN", re.compile(r"(?i)\b(?:otp|mã pin|pin code|mã xác thực)[:\s]*([0-9]{4,8})\b"), 22),
+            EntityDefinition("MEDICAL_RECORD_ID", re.compile(r"(?i)\b(?:ba|hsba|bệnh án|hồ sơ y tế)[:\s]*([a-z0-9-]{6,12})\b"), 20),
 
             # Basic Personal Data (Article 2, Clause 3, Decree 13/2023/ND-CP)
-            EntityDefinition(
-                code="IP_ADDRESS",
-                name="Địa chỉ giao thức mạng (IP Address)",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm d NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"),
-                priority=22,
-            ),
-            EntityDefinition(
-                code="MAC_ADDRESS",
-                name="Địa chỉ vật lý thiết bị (MAC Address)",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm d NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})\b"),
-                priority=22,
-            ),
-            EntityDefinition(
-                code="EMAIL",
-                name="Địa chỉ thư điện tử (Email)",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm d NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,7}\b"),
-                priority=20,
-            ),
-            EntityDefinition(
-                code="HEALTH_INSURANCE_ID",
-                name="Mã thẻ Bảo hiểm Y tế (BHYT)",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm e NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:bhyt|bảo hiểm y tế|mã thẻ bhyt)[:\s]*([A-Z]{2}[0-9A-Z]{13})\b"),
-                priority=18,
-            ),
-            EntityDefinition(
-                code="CITIZEN_ID",
-                name="Số Căn cước công dân / CMND",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b\d{12}\b|\b\d{9}\b"),
-                priority=17,
-            ),
-            EntityDefinition(
-                code="PASSPORT_VN",
-                name="Số Hộ chiếu Việt Nam",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b[B-Db-dKk]\d{7}\b"),
-                priority=16,
-            ),
-            EntityDefinition(
-                code="DRIVER_LICENSE",
-                name="Số Giấy phép lái xe (GPLX)",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:gplx|bằng lái|giấy phép lái xe)[:\s]*([0-9]{12})\b"),
-                priority=16,
-            ),
-            EntityDefinition(
-                code="TAX_ID",
-                name="Mã số thuế cá nhân (MST)",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm e NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:mst|mã số thuế|tax id)[:\s]*([0-9]{10}(?:-[0-9]{3})?)\b"),
-                priority=15,
-            ),
-            EntityDefinition(
-                code="SOCIAL_SECURITY_ID",
-                name="Mã số Bảo hiểm xã hội (BHXH)",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm e NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"(?i)\b(?:bhxh|bảo hiểm xã hội|số sổ bhxh)[:\s]*([0-9]{10})\b"),
-                priority=15,
-            ),
-            EntityDefinition(
-                code="LICENSE_PLATE",
-                name="Biển số xe cơ giới",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm đ NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b(?:[1-9][0-9][A-Za-z][0-9A-Za-z]?)[-.\s]?(?:[0-9]{3}[.][0-9]{2}|[0-9]{4,5}|[0-9]{3})\b"),
-                priority=15,
-            ),
-            EntityDefinition(
-                code="PHONE_NUMBER",
-                name="Số điện thoại cá nhân",
-                category="BASIC_PERSONAL_DATA",
-                legal_ref="Điều 2 Khoản 3 Điểm d NĐ 13/2023/NĐ-CP",
-                pattern=re.compile(r"\b(?:0|\+84)(?:3|5|7|8|9|2)\d{8}\b"),
-                priority=14,
-            ),
+            EntityDefinition("IP_ADDRESS", re.compile(r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"), 22),
+            EntityDefinition("MAC_ADDRESS", re.compile(r"\b(?:[0-9A-Fa-f]{2}[:-]){5}(?:[0-9A-Fa-f]{2})\b"), 22),
+            EntityDefinition("EMAIL", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,7}\b"), 20),
+            EntityDefinition("HEALTH_INSURANCE_ID", re.compile(r"(?i)\b(?:bhyt|bảo hiểm y tế|mã thẻ bhyt)[:\s]*([A-Z]{2}[0-9A-Z]{13})\b"), 18),
+            EntityDefinition("CITIZEN_ID", re.compile(r"\b\d{12}\b|\b\d{9}\b"), 17),
+            EntityDefinition("PASSPORT_VN", re.compile(r"\b[B-Db-dKk]\d{7}\b"), 16),
+            EntityDefinition("DRIVER_LICENSE", re.compile(r"(?i)\b(?:gplx|bằng lái|giấy phép lái xe)[:\s]*([0-9]{12})\b"), 16),
+            EntityDefinition("TAX_ID", re.compile(r"(?i)\b(?:mst|mã số thuế|tax id)[:\s]*([0-9]{10}(?:-[0-9]{3})?)\b"), 15),
+            EntityDefinition("SOCIAL_SECURITY_ID", re.compile(r"(?i)\b(?:bhxh|bảo hiểm xã hội|số sổ bhxh)[:\s]*([0-9]{10})\b"), 15),
+            EntityDefinition("LICENSE_PLATE", re.compile(r"\b(?:[1-9][0-9][A-Za-z][0-9A-Za-z]?)[-.\s]?(?:[0-9]{3}[.][0-9]{2}|[0-9]{4,5}|[0-9]{3})\b"), 15),
+            EntityDefinition("PHONE_NUMBER", re.compile(r"\b(?:0|\+84)(?:3|5|7|8|9|2)\d{8}\b"), 14),
         ]
 
     def mask_text(self, text: str) -> tuple[str, dict[str, str], int]:
@@ -245,23 +121,11 @@ class PresidioPIIEngine:
             unmasked_text = unmasked_text.replace(placeholder, original_value)
         return unmasked_text
 
-    def get_supported_entities(self) -> list[dict[str, str]]:
-        """Returns full schema catalog of supported Decree 13 PII entities."""
-        return [
-            {
-                "code": e.code,
-                "name": e.name,
-                "category": e.category,
-                "legal_ref": e.legal_ref,
-            }
-            for e in self.entities
-        ]
-
     def process_multimodal_ocr(self, image_base64: str) -> tuple[str, str, dict[str, str], int]:
         """
-        Executes the 2-Stream OCR Architecture:
+        Executes 2-Stream OCR Architecture:
         Stream 1: Real Dynamic OCR Tokenization + Exact Pixel Bounding Box Blackout Redaction.
-        Stream 2: Full Document Text Extraction + Presidio Token Masking for Text LLM.
+        Stream 2: Full Document Text Extraction + PII Token Masking for LLM.
         """
         try:
             if not image_base64:
@@ -276,63 +140,37 @@ class PresidioPIIEngine:
             image = Image.open(io.BytesIO(image_data)).convert("RGB")
             draw = ImageDraw.Draw(image)
             width, height = image.size
-
-            font = None
-            try:
-                font = ImageFont.load_default()
-            except Exception as font_err:
-                logger.debug(f"Failed to load default ImageFont: {font_err}")
+            font = ImageFont.load_default()
 
             extracted_lines = []
             redaction_boxes = []
 
             try:
-                candidate_crops = [
-                    (0.0, 0.0, 1.0, 1.0),
-                    (0.26, 0.12, 0.75, 0.88),
-                    (0.20, 0.10, 0.80, 0.90),
-                    (0.15, 0.08, 0.85, 0.92),
-                ]
+                scale = max(1.0, MAX_OCR_SCALING_DIM / max(width, height))
+                scaled = image.resize((int(width * scale), int(height * scale)), Image.Resampling.LANCZOS)
+                gray = scaled.convert("L")
+                enhanced = ImageOps.autocontrast(gray)
 
-                best_lines = {}
-                max_tokens_count = 0
+                ocr_data = pytesseract.image_to_data(enhanced, lang="vie+eng", output_type=Output.DICT, config="--psm 6")
 
-                for x1_pct, y1_pct, x2_pct, y2_pct in candidate_crops:
-                    cx1, cy1 = int(x1_pct * width), int(y1_pct * height)
-                    cx2, cy2 = int(x2_pct * width), int(y2_pct * height)
+                current_lines = {}
+                n_boxes = len(ocr_data.get("text", []))
 
-                    sub_crop = image.crop((cx1, cy1, cx2, cy2))
-                    scale = max(1.0, MAX_OCR_SCALING_DIM / max(sub_crop.width, sub_crop.height))
-                    scaled = sub_crop.resize((int(sub_crop.width * scale), int(sub_crop.height * scale)), Image.Resampling.LANCZOS)
-                    gray = scaled.convert("L")
-                    enhanced = ImageOps.autocontrast(gray)
+                for i in range(n_boxes):
+                    text = ocr_data["text"][i].strip()
+                    if not text:
+                        continue
 
-                    ocr_data = pytesseract.image_to_data(enhanced, lang="vie+eng", output_type=Output.DICT, config="--psm 6")
+                    orig_x = int(ocr_data["left"][i] / scale)
+                    orig_y = int(ocr_data["top"][i] / scale)
+                    orig_w = int(ocr_data["width"][i] / scale)
+                    orig_h = int(ocr_data["height"][i] / scale)
 
-                    current_lines = {}
-                    tokens_count = 0
-                    n_boxes = len(ocr_data.get("text", []))
-
-                    for i in range(n_boxes):
-                        text = ocr_data["text"][i].strip()
-                        if not text:
-                            continue
-
-                        orig_x = cx1 + int(ocr_data["left"][i] / scale)
-                        orig_y = cy1 + int(ocr_data["top"][i] / scale)
-                        orig_w = int(ocr_data["width"][i] / scale)
-                        orig_h = int(ocr_data["height"][i] / scale)
-
-                        token_info = {"text": text, "x": orig_x, "y": orig_y, "w": orig_w, "h": orig_h}
-                        line_id = (ocr_data["block_num"][i], ocr_data["par_num"][i], ocr_data["line_num"][i])
-                        if line_id not in current_lines:
-                            current_lines[line_id] = []
-                        current_lines[line_id].append(token_info)
-                        tokens_count += 1
-
-                    if tokens_count > max_tokens_count:
-                        max_tokens_count = tokens_count
-                        best_lines = current_lines
+                    token_info = {"text": text, "x": orig_x, "y": orig_y, "w": orig_w, "h": orig_h}
+                    line_id = (ocr_data["block_num"][i], ocr_data["par_num"][i], ocr_data["line_num"][i])
+                    if line_id not in current_lines:
+                        current_lines[line_id] = []
+                    current_lines[line_id].append(token_info)
 
                 sensitive_line_patterns = [
                     (r"(?i)\b(?:hotline|tel|sđt|đt|phone)\b", "HOTLINE_TEL"),
@@ -345,7 +183,7 @@ class PresidioPIIEngine:
                     (r"\b\d{12}\b|\b\d{9}\b", "CITIZEN_ID"),
                 ]
 
-                for line_id, tokens in best_lines.items():
+                for line_id, tokens in current_lines.items():
                     line_text = " ".join(tok["text"] for tok in tokens)
                     extracted_lines.append(line_text)
 
@@ -358,20 +196,15 @@ class PresidioPIIEngine:
                             redaction_boxes.append((max(0, min_x - 3), max(0, min_y - 2), min(width, max_x + 3), min(height, max_y + 2), label))
                             break
 
-                logger.info(f"Pyramid OCR extracted {len(extracted_lines)} lines ({max_tokens_count} tokens) and detected {len(redaction_boxes)} exact visual PII boxes.")
+                logger.info(f"1-Pass OCR extracted {len(extracted_lines)} lines and detected {len(redaction_boxes)} PII boxes.")
             except Exception as ocr_err:
-                logger.warning(f"Pyramid OCR execution notice: {ocr_err}")
+                logger.warning(f"OCR execution notice: {ocr_err}")
 
             for x1, y1, x2, y2, label in redaction_boxes:
                 draw.rectangle([x1, y1, x2, y2], fill=REDACTION_FILL_COLOR, outline=REDACTION_BORDER_COLOR, width=2)
                 tag_text = f"[REDACTED: {label}]"
                 text_y = y1 + max(1, (y2 - y1 - 8) // 2)
                 draw.text((x1 + 4, text_y), tag_text, fill=REDACTION_TEXT_COLOR, font=font)
-
-            banner_height = max(24, int(height * 0.04))
-            draw.rectangle([0, 0, width, banner_height], fill=BANNER_BG_COLOR)
-            banner_text = "PRESIDIO 2-STREAM OCR REDACTOR - NGHI DINH 13/2023/ND-CP COMPLIANT"
-            draw.text((10, max(4, (banner_height - 10) // 2)), banner_text, fill=BANNER_TEXT_COLOR, font=font)
 
             buffered = io.BytesIO()
             image.save(buffered, format="PNG")
@@ -380,14 +213,10 @@ class PresidioPIIEngine:
             raw_extracted_text = "\n".join(extracted_lines)
             raw_masked_text, raw_mapping, pii_count = self.mask_text(raw_extracted_text)
 
-            # Namespace OCR placeholders with OCR_ prefix to prevent collisions with prompt PII tokens
             ocr_mapping = {}
             masked_ocr_text = raw_masked_text
             for placeholder, val in raw_mapping.items():
-                if placeholder.startswith("<") and placeholder.endswith(">"):
-                    ocr_placeholder = f"<OCR_{placeholder[1:]}"
-                else:
-                    ocr_placeholder = f"<OCR_{placeholder}>"
+                ocr_placeholder = f"<OCR_{placeholder[1:]}"
                 ocr_mapping[ocr_placeholder] = val
                 masked_ocr_text = masked_ocr_text.replace(placeholder, ocr_placeholder)
 
@@ -397,11 +226,6 @@ class PresidioPIIEngine:
         except Exception as e:
             logger.error(f"Error in process_multimodal_ocr: {e}")
             return image_base64, "", {}, 0
-
-    def redact_image_preview(self, image_base64: str) -> str:
-        """Backward-compatible helper returning redacted visual preview."""
-        redacted_b64, _, _, _ = self.process_multimodal_ocr(image_base64)
-        return redacted_b64
 
 
 presidio_engine = PresidioPIIEngine()

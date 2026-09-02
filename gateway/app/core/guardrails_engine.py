@@ -8,8 +8,6 @@ from gateway.app.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-MIN_SYSTEM_PROMPT_PREFIX_LEN = 30
-
 
 class GuardrailsEngine:
     def __init__(self) -> None:
@@ -37,16 +35,11 @@ class GuardrailsEngine:
 
     def validate_output(self, output_text: str, system_prompt: str = "") -> tuple[bool, str | None]:
         """Verifies that the LLM output does not leak proprietary system instructions."""
-        if not output_text or not system_prompt:
-            return True, None
-
-        if len(system_prompt) >= MIN_SYSTEM_PROMPT_PREFIX_LEN:
-            prefix_check = system_prompt[:MIN_SYSTEM_PROMPT_PREFIX_LEN].lower()
-            if prefix_check in output_text.lower():
+        if output_text and system_prompt and len(system_prompt) >= 10:
+            if system_prompt.lower() in output_text.lower():
                 msg = "Output blocked by DLP Guardrail (System prompt leakage detected)."
                 logger.warning(msg)
                 return False, msg
-
         return True, None
 
 
