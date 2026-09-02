@@ -20,7 +20,7 @@ LOGS_DIR = PROJECT_ROOT / "logs"
 
 def ensure_directories() -> None:
     """Safely bootstrap runtime directories without import-time side-effects."""
-    for runtime_dir in [ARTIFACTS_DIR, LOGS_DIR, STATIC_DIR]:
+    for runtime_dir in [ARTIFACTS_DIR, LOGS_DIR]:
         runtime_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     vllm_base_url: str = Field(default="http://localhost:8000/v1", alias="VLLM_BASE_URL")
     vllm_model_name: str = Field(default="Qwen/Qwen2.5-0.5B-Instruct", alias="VLLM_MODEL_NAME")
-    hugging_face_hub_token: str | None = Field(default=None, alias="HUGGING_FACE_HUB_TOKEN")
+    hf_token: str | None = Field(default=None, alias="HF_TOKEN")
 
     redis_host: str = Field(default="localhost", alias="REDIS_HOST")
     redis_port: int = Field(default=6379, alias="REDIS_PORT")

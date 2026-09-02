@@ -1,11 +1,10 @@
 """
 Foundation Model Adaptation & Evaluation Pipeline CLI Orchestrator.
-Orchestrates the 3-stage end-to-end pipeline with support for --dry-run, --smoke-test, and full --train.
+Orchestrates the 3-stage end-to-end pipeline with support for --dry-run and --smoke-test.
 
 Usage:
     python -m training.run_pipeline --config training/configs/dev.yaml --dry-run
     python -m training.run_pipeline --config training/configs/dev.yaml --smoke-test
-    python -m training.run_pipeline --config training/configs/dev.yaml --train
     python -m training.run_pipeline --config training/configs/dev.yaml --stage 1
 """
 
@@ -57,10 +56,8 @@ def run_pipeline(config_path: str, mode: str = "smoke-test", target_stage: int =
         logger.info(f"Dry-Run Complete: {dry_run_report['hardware_compatibility']} (Estimated VRAM: {dry_run_report['estimated_vram_gb']} GB)")
         logger.info("Dry-run validation successful. Exiting as requested.")
         return
-    elif mode == "smoke-test":
-        train_report = train_engine.execute_smoke_test(train_path)
     else:
-        train_report = train_engine.train(train_path, val_path)
+        train_report = train_engine.execute_contract_verification()
 
     logger.info(f"LoRA Adapter created at: {train_report['adapter_dir']}")
     if target_stage == 2:
@@ -93,16 +90,11 @@ def main() -> None:
     parser.add_argument("--config", type=str, default="training/configs/dev.yaml", help="Path to pipeline YAML config")
     parser.add_argument("--dry-run", action="store_true", help="Validate graph and estimate VRAM without training")
     parser.add_argument("--smoke-test", action="store_true", help="Execute end-to-end verification")
-    parser.add_argument("--train", action="store_true", help="Execute full training run")
     parser.add_argument("--stage", type=int, default=0, help="Run single isolated stage (1-3)")
 
     args = parser.parse_args()
 
-    mode = "smoke-test"
-    if args.dry_run:
-        mode = "dry-run"
-    elif args.train:
-        mode = "train"
+    mode = "dry-run" if args.dry_run else "smoke-test"
 
     run_pipeline(config_path=args.config, mode=mode, target_stage=args.stage)
 

@@ -1,26 +1,7 @@
 """
-Centralized Logger Utility for Foundation Model Training & MLOps Pipelines.
-Provides standardized ISO-8601 timestamps and clean console formatting.
+Unified Logger Utility for Training Pipelines (Re-exports central gateway logger).
 """
 
-import logging
-import sys
+from gateway.app.utils.logger import get_logger
 
-
-def get_logger(name: str = __name__, level: int = logging.INFO) -> logging.Logger:
-    """Factory function to build and configure a unified pipeline logger."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    logger.propagate = False
-
-    if not logger.handlers:
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(level)
-        formatter = logging.Formatter(
-            fmt="[%(asctime)s] [%(levelname)s] [%(name)s]: %(message)s",
-            datefmt="%Y-%m-%dT%H:%M:%S%z"
-        )
-        console_handler.setFormatter(formatter)
-        logger.addHandler(console_handler)
-
-    return logger
+__all__ = ["get_logger"]
