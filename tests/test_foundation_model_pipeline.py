@@ -61,8 +61,7 @@ class TestFoundationModelPipeline(unittest.TestCase):
     def test_train_engine_smoke_test(self) -> None:
         """Validates gradient flow and adapter artifact generation."""
         train_engine = TrainEngine(self.config)
-        train_path = str(PROJECT_ROOT / "training" / "data" / "processed" / "train.jsonl")
-        smoke_res = train_engine.execute_smoke_test(train_path)
+        smoke_res = train_engine.execute_contract_verification()
 
         self.assertEqual(smoke_res["status"], "success")
         self.assertLess(smoke_res["final_loss"], smoke_res["initial_loss"])

@@ -34,7 +34,7 @@ class TestInfrastructureConfig(unittest.TestCase):
         self.assertTrue(req_path.exists(), "requirements.txt must exist at root")
         content = req_path.read_text(encoding="utf-8")
         self.assertIn("fastapi", content)
-        self.assertIn("presidio-analyzer", content)
+        self.assertIn("pytesseract", content)
         self.assertIn("json-repair", content)
         self.assertIn("pydantic", content)
         self.assertIn("prometheus-fastapi-instrumentator", content)

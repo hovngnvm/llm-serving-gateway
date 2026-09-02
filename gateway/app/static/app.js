@@ -4,8 +4,6 @@ let currentImageB64 = "";
 let lastResponseData = null;
 
 const DEFAULT_API_KEY = "secret_enterprise_ai_key_2026";
-const HEALTH_POLL_INTERVAL_MS = 4000;
-const MODELS_POLL_INTERVAL_MS = 10000;
 const DEFAULT_TEMPERATURE = 0.2;
 const DEFAULT_MAX_TOKENS = 512;
 
@@ -25,8 +23,6 @@ const PROMPT_TEMPLATES = {
 document.addEventListener("DOMContentLoaded", () => {
   fetchGatewayHealth();
   fetchAvailableModels();
-  setInterval(fetchGatewayHealth, HEALTH_POLL_INTERVAL_MS);
-  setInterval(fetchAvailableModels, MODELS_POLL_INTERVAL_MS);
   initTabs();
   initDropzone();
 });
@@ -248,11 +244,11 @@ function renderResponse(rawPrompt, responseData, clientLatency) {
   document.getElementById("metricLatency").textContent = `${meta.execution_time_ms || clientLatency} ms`;
   document.getElementById("metricPii").textContent = meta.pii_redacted_count || 0;
   document.getElementById("metricRepair").textContent = meta.json_auto_repaired ? "YES" : "NO";
-  document.getElementById("metricSelfCorrection").textContent = meta.schema_validated || meta.self_correction_passed ? "PASSED" : "FAILED";
+  document.getElementById("metricSelfCorrection").textContent = meta.schema_validated ? "PASSED" : "N/A";
 
   // 2. Tab 1: AI Output
   const textSummaryBox = document.getElementById("textSummaryBox");
-  const reportContent = formats.markdown_report || formats.text_summary || "";
+  const reportContent = formats.text_summary || "";
   textSummaryBox.textContent = reportContent || "Không có phản hồi tóm tắt.";
 
   const btnDownloadMd = document.getElementById("btnDownloadMd");
@@ -270,12 +266,7 @@ function renderResponse(rawPrompt, responseData, clientLatency) {
 
   // 3. Tab 2: PII Redaction Inspector (Decree 13 Compliant)
   document.getElementById("diffRawPrompt").textContent = rawPrompt || "(Chỉ gửi ảnh)";
-  
-  let maskedText = rawPrompt;
-  if (meta.pii_redacted_count > 0 && formats.structured_data && formats.structured_data.query) {
-    maskedText = formats.structured_data.query;
-  }
-  document.getElementById("diffMaskedPrompt").textContent = maskedText;
+  document.getElementById("diffMaskedPrompt").textContent = rawPrompt;
 
   // Redacted Image Preview
   const redactedImgWrapper = document.getElementById("redactedImgWrapper");
@@ -296,9 +287,9 @@ function renderResponse(rawPrompt, responseData, clientLatency) {
   document.getElementById("perfNetworkRoundtrip").textContent = `${clientLatency} ms`;
 
   // 5. Tab 4: Self-Correction & JSON Auto-Repair
-  document.getElementById("selfCorrectionStatus").textContent = (meta.schema_validated || meta.self_correction_passed)
-    ? "✅ Đạt chuẩn 100% (Schema + Grounding + Math Check)" 
-    : "⚠️ Phát hiện sai sót logic / ảo giác";
+  document.getElementById("selfCorrectionStatus").textContent = meta.schema_validated
+    ? "✅ Đạt chuẩn 100% (Schema + Math Balance Check)" 
+    : "ℹ️ Phản hồi dạng văn bản tự do hoặc schema không bắt buộc";
   document.getElementById("jsonRepairStatus").textContent = meta.json_auto_repaired
     ? "✅ Đã tự động vá lỗi cú pháp JSON (thiếu ngoặc / dư phẩy)"
     : "✅ JSON đầu ra nguyên bản hợp lệ";
