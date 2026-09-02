@@ -14,8 +14,12 @@ ENV/
 # Data & Model caches
 /data/
 *.safetensors
+*.bin
 *.gguf
 .cache/
+artifacts/runs/
+training/data/processed/
+logs/
 
 # Testing & Coverage
 .pytest_cache/

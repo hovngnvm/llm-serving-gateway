@@ -1,10 +1,10 @@
-# AI Security Gateway & Foundation Model Adaptation Platform
+# AI Serving & Security Gateway
 
 ## Project Overview
 
-A production-grade **AI Security Gateway & Foundation Model Adaptation Platform**. The system combines a high-performance **FastAPI Security Gateway**, a **Microsoft Presidio PII Protection Engine** (supporting 17 localized entity types), a **Low-Latency Semantic Vector Cache** (Redis / In-memory cosine similarity), a **Dynamic Intent Router with Zero-Touch Manifest Auto-Discovery**, a **Structured Output Parser & Pydantic Schema Validator**, an asynchronous **Neon Serverless PostgreSQL Cloud Audit Logger**, and an offline **3-Stage Foundation Model Adaptation Pipeline** (Dataset Validation, QLoRA 4-bit SFT Engine, and Model Evaluation).
+A **Private Multimodal Serving & Security Gateway** with localized Vietnamese Data Protection Regulation (**Nghị định 13/2023/NĐ-CP**) compliance. The platform unifies **Dual-Stream Multimodal PII Redaction** (text & image OCR with non-overlapping right-to-left span offset replacement and pixel blackout), sub-5ms low-latency **Native HNSW Semantic Vector Caching** via Redis Stack, **Zero-Touch Dynamic LoRA Intent Routing** auto-discovered from MLOps `manifest.json` contracts, declarative **Pydantic Structured Output Validation** with arithmetic math balance verification and automated `json-repair`, **vLLM-backed LLM Serving**, asynchronous compliance audit logging to **Neon Serverless PostgreSQL** with SSL/TLS, real-time telemetry via **Prometheus**, and an offline 3-stage **QLoRA Fine-Tuning & Evaluation Pipeline**.
 
-**Business Goal:** Provide a comprehensive PII redaction layer with 17 localized entity recognizers for LLM deployments, reduce repetitive compute via Redis semantic caching, enforce structural Pydantic validation on model responses, and enable continuous foundation model adaptation with zero-downtime LoRA adapter hot-reloading.
+**Business Goal:** Provide banking, finance, and sensitive domain applications with a high-throughput, sub-5ms cached AI inference gateway that strictly enforces Decree 13/2023/NĐ-CP data privacy, halts prompt injections, prevents math hallucinations, and guarantees zero-downtime hot-swapping of fine-tuned domain LoRA adapters.
 
 ---
 
@@ -12,155 +12,183 @@ A production-grade **AI Security Gateway & Foundation Model Adaptation Platform*
 
 ```mermaid
 flowchart TD
-    subgraph Offline [Offline: 3-Stage Foundation Model Adaptation]
-        yaml_config["Declarative Config<br/>(training/configs/dev.yaml)"]:::config
-        dataset_val["Stage 1: Dataset Validator<br/>(ChatML Format & PII Audit)"]:::offline
-        qlora_sft["Stage 2: QLoRA SFT Engine<br/>(4-bit NF4, LoRA r=16, alpha=32)"]:::offline
-        eval_engine["Stage 3: Evaluation Engine<br/>(JSON Validity & Field Accuracy)"]:::offline
-        manifest_gen["Manifest Builder<br/>(artifacts/manifest.json)"]:::offline
-        
-        yaml_config --> dataset_val
-        dataset_val --> qlora_sft
-        qlora_sft --> eval_engine
-        eval_engine --> manifest_gen
+    subgraph Clients [Clients & Interfaces]
+        web_ui["Interactive Web Playground<br/>(:8080/playground)"]:::client
+        ext_app["External Applications<br/>(OpenAI-Compatible REST API)"]:::client
     end
 
-    subgraph ArtifactStore [Model & Adapter Store]
-        lora_adapter["LoRA Adapter Artifacts<br/>(artifacts/runs/dev/adapter/)"]:::artifact
-        manifest_json["Production Manifest<br/>(Contract & Metadata)"]:::artifact
-        manifest_gen --> lora_adapter
-        manifest_gen --> manifest_json
+    subgraph SecurityLayer [Security & Privacy Guardrails]
+        auth_guard["API Key Guard<br/>(X-API-Key Header)"]:::gateway
+        prompt_shield["System Prompt Shield<br/>(Prompt Injection & Jailbreak Defense)"]:::security
+        pii_engine["Decree 13 PII Redaction Engine<br/>(17 VN Entities RTL Span Replacement)"]:::security
+        ocr_engine["Multimodal OCR Stream<br/>(Tesseract Blackout Redaction)"]:::security
     end
 
-    subgraph Gateway [Online: Security Gateway :8080]
-        client_req["Client Request / Cockpit UI<br/>(POST /v1/chat/completions)"]:::client
-        presidio["PII Filter<br/>(17 Entity Types Redaction)"]:::security
-        semantic_cache{"Semantic Vector Cache<br/>(Redis / Cosine Sim > 0.90)"}:::cache
-        intent_router["Dynamic Intent Router<br/>(Zero-Touch Manifest Discovery)"]:::router
-        guardrails["Guardrails Engine<br/>(Jailbreak & Prompt Injection Defense)"]:::security
-        output_val["Output Parser & Schema Validator<br/>(Pydantic v2 Contract & Syntax Fixer)"]:::repair
-        neon_audit[("Neon Cloud PostgreSQL<br/>(Async Audit Logger)")]:::db
-
-        client_req --> presidio
-        presidio --> semantic_cache
-        semantic_cache -->|Cache Miss| intent_router
-        intent_router --> guardrails
-        guardrails --> llm_host
-        llm_host --> output_val
-        output_val --> client_req
-        output_val -.->|Async Audit Trail| neon_audit
-        semantic_cache -.->|Cache Hit < 5ms| client_req
+    subgraph CacheLayer [Sub-5ms Semantic Caching]
+        redis_hnsw["Redis Stack Vector Cache<br/>(RediSearch HNSW Cosine Index)"]:::cache
+        l1_cache["L1 In-Memory LRU Cache<br/>(Fallback Memory Store)"]:::cache
     end
 
-    subgraph Serving [Inference Serving Host :8000]
-        llm_host["OpenAI-Compatible Inference Host<br/>(Ollama / vLLM / Host Server)"]:::serving
+    subgraph RoutingLayer [Dynamic Intent Routing]
+        intent_router["Domain Intent Router<br/>(Keyword & Regex Pattern Matching)"]:::router
+        manifest_reg["Manifest Contract Registry<br/>(Zero-Touch LoRA Discovery)"]:::router
     end
 
-    manifest_json -.->|Auto-Reload| intent_router
-    lora_adapter -.->|Load Weights| llm_host
+    subgraph InferenceLayer [Model Serving & Inference]
+        vllm_host["vLLM Serving Host :8000<br/>(PagedAttention & Async Engine)"]:::serving
+        qwen_base["Base Foundation Model<br/>(Qwen2.5-0.5B-Instruct)"]:::serving
+        lora_adapter["Fine-Tuned Domain Adapters<br/>(financial_adapter LoRA SFT)"]:::serving
+    end
+
+    subgraph ValidationAudit [Validation, Audit & Observability]
+        validator["Pydantic Output Validator<br/>(Financial Math Balance Verification)"]:::validator
+        json_repair["json-repair Engine<br/>(Automated Syntax Recovery)"]:::validator
+        neon_db[("Neon PostgreSQL Cloud<br/>(Async SSL/TLS Audit Trail)")]:::storage
+        prom_metrics["Prometheus Metrics Exporter<br/>(/metrics Endpoint)"]:::telemetry
+    end
+
+    %% Flow lines
+    web_ui -->|HTTP POST| auth_guard
+    ext_app -->|HTTP POST| auth_guard
+    auth_guard --> prompt_shield
+    prompt_shield --> pii_engine
+    pii_engine --> ocr_engine
+
+    ocr_engine -->|Sanitized Prompt| redis_hnsw
+    redis_hnsw -.->|Cache Miss Fallback| l1_cache
+    redis_hnsw -->|Cache Hit < 5ms| web_ui
+    redis_hnsw -->|Cache Hit < 5ms| ext_app
+
+    redis_hnsw -->|Cache Miss| intent_router
+    manifest_reg -.->|Auto-Register| intent_router
+    intent_router -->|Route to Base or LoRA| vllm_host
+    vllm_host --> qwen_base
+    vllm_host --> lora_adapter
+
+    vllm_host -->|Raw Completion| json_repair
+    json_repair --> validator
+    validator -->|Pydantic Verified Payload| web_ui
+    validator -->|Pydantic Verified Payload| ext_app
+
+    validator -.->|Async Background Task| neon_db
+    validator -.->|Record Cache Entry| redis_hnsw
+    auth_guard -.->|Telemetry Scrape| prom_metrics
 
     %% Style Classes
-    classDef config fill:#E5E7EB,stroke:#9CA3AF,color:#1F2937,stroke-width:2px;
-    classDef offline fill:#FFEDD5,stroke:#FB923C,color:#7C2D12,stroke-width:2px;
-    classDef artifact fill:#FEF3C7,stroke:#FBBF24,color:#78350F,stroke-width:2px;
-    classDef client fill:#E0F2FE,stroke:#38BDF8,color:#0369A1,stroke-width:2px;
+    classDef client fill:#E5E7EB,stroke:#9CA3AF,color:#1F2937,stroke-width:2px;
+    classDef gateway fill:#CCFBF1,stroke:#14B8A6,color:#115E59,stroke-width:2px;
     classDef security fill:#FEE2E2,stroke:#EF4444,color:#7F1D1D,stroke-width:2px;
-    classDef cache fill:#D1FAE5,stroke:#10B981,color:#065F46,stroke-width:2px;
-    classDef router fill:#F3E8FF,stroke:#A855F7,color:#581C87,stroke-width:2px;
-    classDef repair fill:#FFFBEB,stroke:#F59E0B,color:#92400E,stroke-width:2px;
-    classDef serving fill:#CCFBF1,stroke:#14B8A6,color:#115E59,stroke-width:2px;
-    classDef db fill:#EDE9FE,stroke:#8B5CF6,color:#4C1D95,stroke-width:2px;
+    classDef cache fill:#FEF3C7,stroke:#F59E0B,color:#78350F,stroke-width:2px;
+    classDef router fill:#EDE9FE,stroke:#8B5CF6,color:#4C1D95,stroke-width:2px;
+    classDef serving fill:#D1FAE5,stroke:#10B981,color:#065F46,stroke-width:2px;
+    classDef validator fill:#E0F2FE,stroke:#0284C7,color:#075985,stroke-width:2px;
+    classDef storage fill:#DBEAFE,stroke:#3B82F6,color:#1E3A8A,stroke-width:2px;
+    classDef telemetry fill:#F3E8FF,stroke:#C084FC,color:#581C87,stroke-width:2px;
 ```
 
-* **API Gateway & Serving:** ![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688?style=flat&logo=fastapi&logoColor=white) + ![Uvicorn](https://img.shields.io/badge/Uvicorn-ASGI-2C3E50?style=flat)
-* **Model Training & PEFT:** ![PyTorch](https://img.shields.io/badge/PyTorch-2.2.0-EE4C2C?style=flat&logo=pytorch&logoColor=white) + ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-FFD21E?style=flat&logo=huggingface&logoColor=black) + ![PEFT](https://img.shields.io/badge/PEFT-QLoRA-8A2BE2?style=flat) + ![BitsAndBytes](https://img.shields.io/badge/BitsAndBytes-NF4-4B0082?style=flat)
-* **Privacy & Security:** ![Microsoft Presidio](https://img.shields.io/badge/Microsoft%20Presidio-PII-0078D4?style=flat&logo=microsoft&logoColor=white)
-* **Caching & Storage:** ![Redis](https://img.shields.io/badge/Redis-7.2-DC382D?style=flat&logo=redis&logoColor=white) + ![Neon Postgres](https://img.shields.io/badge/Neon%20Postgres-Cloud-00E599?style=flat&logo=postgresql&logoColor=white)
-* **Validation & Schemas:** ![Pydantic](https://img.shields.io/badge/Pydantic-v2-E92063?style=flat&logo=pydantic&logoColor=white)
+* **High-Performance Gateway:** ![FastAPI](https://img.shields.io/badge/FastAPI-0.110.0-009688?style=flat&logo=fastapi&logoColor=white) + ![Uvicorn](https://img.shields.io/badge/Uvicorn-ASGI-499848?style=flat&logo=gunicorn&logoColor=white) + ![Pydantic](https://img.shields.io/badge/Pydantic-v2.7-E92063?style=flat&logo=pydantic&logoColor=white) (`pydantic-settings` singleton)
+* **Privacy & Compliance Engine:** ![Microsoft Presidio](https://img.shields.io/badge/Presidio-Decree%2013-0078D4?style=flat&logo=microsoft&logoColor=white) + ![Tesseract OCR](https://img.shields.io/badge/Tesseract-OCR%205.0-5C5C5C?style=flat) + ![Pillow](https://img.shields.io/badge/Pillow-10.3-11557C?style=flat)
+* **Low-Latency Vector Caching:** ![Redis Stack](https://img.shields.io/badge/Redis%20Stack-RediSearch%20HNSW-DC382D?style=flat&logo=redis&logoColor=white) (Cosine distance metric, sub-5ms SLA)
+* **Model Serving Host:** ![vLLM](https://img.shields.io/badge/vLLM-v0.6.3-4A90E2?style=flat) (OpenAI-compatible `/v1/chat/completions`, PagedAttention)
+* **Fine-Tuning & MLOps:** ![PyTorch](https://img.shields.io/badge/PyTorch-2.2.0-EE4C2C?style=flat&logo=pytorch&logoColor=white) + ![HuggingFace](https://img.shields.io/badge/HuggingFace-Transformers-FFD21E?style=flat&logo=huggingface&logoColor=black) + ![PEFT](https://img.shields.io/badge/PEFT-QLoRA-8A2BE2?style=flat) + ![BitsAndBytes](https://img.shields.io/badge/BitsAndBytes-4bit%20Quant-orange?style=flat)
+* **Structured Output & Auto-Repair:** ![JSON Repair](https://img.shields.io/badge/json--repair-0.25-blue?style=flat) + ![Pydantic Validation](https://img.shields.io/badge/Pydantic-Schema%20Contract-E92063?style=flat)
+* **Compliance Audit Database:** ![Neon Postgres](https://img.shields.io/badge/Neon%20Postgres-Serverless%20Cloud-00E599?style=flat&logo=postgresql&logoColor=white) (`asyncpg` connection pool with SSL/TLS)
+* **Observability & Telemetry:** ![Prometheus](https://img.shields.io/badge/Prometheus-Metrics-E6522C?style=flat&logo=prometheus&logoColor=white) + ![RedisInsight](https://img.shields.io/badge/RedisInsight-Dashboard-DC382D?style=flat&logo=redis&logoColor=white)
+* **Unit & Integration Testing:** ![pytest](https://img.shields.io/badge/pytest-30%20tests%20passing-0A9EDC?style=flat&logo=pytest&logoColor=white) (`pytest-asyncio`)
 * **Containerization:** ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)
 
 ---
 
-## PII Redaction Engine & Privacy Filter (17 Entity Types)
+## Intent Routing & LoRA Adapter Decision Matrix
 
-The Gateway embeds a customized **Microsoft Presidio Engine** (`gateway/app/core/presidio_engine.py`) configured to detect, classify, and sanitize **17 Vietnamese Personal Identifiable Information (PII)** entity types before prompt payloads are dispatched to inference backends:
+The serving gateway dynamically routes user prompts to specialized fine-tuned domain adapters without requiring code changes or application restarts:
 
-| PII Entity Type | Recognized Scope & Pattern | Detection Mechanism | Redaction / Masking Format | Data Category |
-| :--- | :--- | :--- | :---: | :--- |
-| `VIETNAMESE_CITIZEN_ID` | 12-digit Citizen Identity Card (CCCD) | Regex pattern + Checksum validator | `<VIETNAMESE_CITIZEN_ID>` | Sensitive Personal Data |
-| `VIETNAMESE_TAX_ID` | 10 or 13-digit Tax Identification Number (MST) | Contextual keyword regex + Length check | `<VIETNAMESE_TAX_ID>` | Basic Personal Data |
-| `BANK_ACCOUNT_NUMBER` | 8–19 digit domestic bank account numbers | Context-driven recognizer (`stk`, `tk ngân hàng`) | `<BANK_ACCOUNT_NUMBER>` | Financial Data |
-| `CREDIT_CARD_NUMBER` | 16-digit Visa/Mastercard/JCB cards | Luhn Algorithm + Regex recognizer | `<CREDIT_CARD_NUMBER>` | Sensitive Financial Data |
-| `PHONE_NUMBER` | Vietnamese mobile numbers (03x, 05x, 07x, 08x, 09x, +84) | Presidio Phone Recognizer + VN prefix matcher | `<PHONE_NUMBER>` | Basic Personal Data |
-| `EMAIL_ADDRESS` | Standard RFC 5322 email patterns | Presidio Email Recognizer | `<EMAIL_ADDRESS>` | Basic Personal Data |
-| `PERSON` | Vietnamese & International Full Names | Spacy NER + Vietnamese naming patterns | `<PERSON>` | Basic Personal Data |
-| `LOCATION_ADDRESS` | Street names, wards, districts, and provinces | Spacy NER + Vietnamese geographic lexicon | `<LOCATION_ADDRESS>` | Basic Personal Data |
-| `PASSPORT_NUMBER` | Vietnamese passport codes (B, C, K, M, N, P + 7 digits) | Regex recognizer | `<PASSPORT_NUMBER>` | Sensitive Personal Data |
-| `DRIVER_LICENSE` | 12-digit National Driving License numbers | Contextual keyword regex (`gplx`, `bằng lái`) | `<DRIVER_LICENSE>` | Basic Personal Data |
-| `IP_ADDRESS` | IPv4 & IPv6 network addresses | Presidio IP Recognizer | `<IP_ADDRESS>` | Technical Identifier |
-| `DATE_OF_BIRTH` | Date strings (DD/MM/YYYY, YYYY-MM-DD) | Date/Time recognizer with DOB context | `<DATE_OF_BIRTH>` | Basic Personal Data |
-| `HEALTH_INSURANCE_ID` | 10-digit Social/Health Insurance codes (BHYT) | Context regex (`bhyt`, `số bảo hiểm`) | `<HEALTH_INSURANCE_ID>` | Sensitive Health Data |
-| `VEHICLE_PLATE` | Vietnamese vehicle license plates (e.g., 29A-123.45) | Regional format regex recognizer | `<VEHICLE_PLATE>` | Basic Personal Data |
-| `FINANCIAL_INCOME` | Salary amounts, transaction amounts in VND/USD | Numerical currency regex (`vnd`, `triệu`, `k`) | `<FINANCIAL_INCOME>` | Sensitive Financial Data |
-| `PASSWORD_SECRET` | Passwords, private keys, API secrets | High-entropy string & keyword matcher | `<PASSWORD_SECRET>` | Security Credential |
-| `API_TOKEN` | Bearer tokens, JWTs, cloud API keys | Regex recognizer for token formats | `<API_TOKEN>` | Security Credential |
+| Target Intent / Domain | Sample User Query | Routing Mechanism | Resolved Model / Adapter | Underlying Strategy & Handling |
+| :--- | :--- | :--- | :--- | :--- |
+| **Financial Extraction** | *"Chuyển 5.000.000 VND từ CCCD 079123456789 số thẻ 4111222233334444 cho số điện thoại 0901234567"* | Keyword matching (`chuyển tiền`, `stk`, `ngân hàng`) + Regex patterns | `financial_adapter` | Routes to QLoRA fine-tuned adapter; enforces `FinancialTransactionSchema` with arithmetic math validation |
+| **Invoice / Receipt OCR** | Base64 invoice image payload with extracted text: *"Cộng tiền hàng: 100.000 đ, Thuế GTGT: 10.000 đ, Tổng cộng: 110.000 đ"* | Multimodal stream detector (`image_url`) + Financial keyword analyzer | `financial_adapter` | Applies 1-pass OCR blackout redaction, injects sanitized OCR block into prompt, evaluates math balance |
+| **General Assistance** | *"Giải thích nguyên lý hoạt động của cơ chế PagedAttention trong vLLM"* | Fallback default route | `Qwen/Qwen2.5-0.5B-Instruct` | Direct invocation to base foundation model without adapter overhead |
+| **Explicit Model Override** | Query with explicit `"model": "financial_adapter"` in JSON request body | Header / payload model parameter override | `financial_adapter` | Respects caller-specified model parameter over automatic intent detection |
+| **Dynamic MLOps Discovery** | New domain adapter exported to `artifacts/runs/**/manifest.json` | Automatic directory scan (`auto_discover_from_artifacts`) | Discovered Adapter Name | Dynamically registers intent rules, keywords, and adapter paths on boot |
 
 ---
 
-## Dynamic Intent Router & LoRA Manifest Discovery
+## Decree 13/2023/NĐ-CP Compliance & Security Architecture
 
-The `IntentRouter` (`gateway/app/core/intent_router.py`) reads declarative manifest contracts (`artifacts/runs/*/manifest.json`) at runtime without requiring server restarts:
+The platform enforces data sovereignty and privacy compliance according to **Nghị định số 13/2023/NĐ-CP** (Bảo vệ dữ liệu cá nhân) across both text and multimodal image streams:
 
-| Target Domain / Intent | Trigger Condition & Extraction Pattern | Routing Action | Target Model / Adapter |
-| :--- | :--- | :--- | :--- |
-| `financial_transaction_extraction` | Keywords: `chuyển tiền`, `stk`, `số tài khoản`, `sao kê`, `techcombank`, `vietcombank`<br>Regex: `\b\d{1,3}(?:[.,]\d{3})*\s*(?:vnd\|đ\|nghìn\|triệu)\b` | Auto-inject LoRA Adapter | **`financial_adapter`** (Fine-Tuned QLoRA Layer) |
-| `general_inquiry` | Standard conversational queries without domain keywords | Route to Base Model | **`Qwen2.5-0.5B-Instruct`** (Base Foundation Model) |
-| `custom_domain_adapter` | New adapters registered in `artifacts/runs/*/manifest.json` | Zero-Touch Discovery | Dynamically bound adapter defined by manifest config |
+### 1. Classification of 17 Vietnamese PII Entities
+
+| Decree 13 Category | Entity Code | Legal Definition (NĐ 13/2023/NĐ-CP) | Pattern / Detection Scope | Redaction Mask Token |
+| :--- | :--- | :--- | :--- | :--- |
+| **Sensitive Personal Data** | `GPS_LOCATION` | Điều 2 Khoản 4: Thông tin vị trí địa lý cá nhân | Geographic latitude/longitude coordinates | `[GPS_LOCATION_x]` |
+| **Sensitive Personal Data** | `CREDIT_CARD` | Điều 2 Khoản 4: Dữ liệu tài khoản tài chính, số thẻ tín dụng | 13–19 digit credit card numbers (Visa, Mastercard, JCB) | `[CREDIT_CARD_x]` |
+| **Sensitive Personal Data** | `BANK_ACCOUNT` | Điều 2 Khoản 4: Dữ liệu tài khoản ngân hàng (STK) | 8–16 digit account numbers preceded by `stk`, `số tk` | `[BANK_ACCOUNT_x]` |
+| **Sensitive Personal Data** | `CVV_CVC` | Điều 2 Khoản 4: Mã bảo mật thẻ thanh toán | 3–4 digit CVV/CVC codes | `[CVV_CVC_x]` |
+| **Sensitive Personal Data** | `OTP_PIN` | Điều 2 Khoản 4: Mã xác thực giao dịch, mã PIN | 4–8 digit OTP/PIN security codes | `[OTP_PIN_x]` |
+| **Sensitive Personal Data** | `MEDICAL_RECORD_ID` | Điều 2 Khoản 4: Dữ liệu y tế và hồ sơ bệnh án | Medical record and health IDs (`ba`, `hsba`) | `[MEDICAL_RECORD_ID_x]` |
+| **Basic Personal Data** | `CITIZEN_ID` | Điều 2 Khoản 3: Số định danh cá nhân, CCCD / CMND | 12-digit CCCD or 9-digit CMND numbers | `[CITIZEN_ID_x]` |
+| **Basic Personal Data** | `PASSPORT_VN` | Điều 2 Khoản 3: Số hộ chiếu Việt Nam | Vietnamese passport format (`B`, `C`, `D`, `K` + 7 digits) | `[PASSPORT_VN_x]` |
+| **Basic Personal Data** | `DRIVER_LICENSE` | Điều 2 Khoản 3: Giấy phép lái xe (GPLX) | 12-digit national driver's license numbers | `[DRIVER_LICENSE_x]` |
+| **Basic Personal Data** | `TAX_ID` | Điều 2 Khoản 3: Mã số thuế (MST) cá nhân/doanh nghiệp | 10-digit or 13-digit tax identification numbers | `[TAX_ID_x]` |
+| **Basic Personal Data** | `SOCIAL_SECURITY_ID`| Điều 2 Khoản 3: Mã số bảo hiểm xã hội (BHXH) | 10-digit national social security numbers | `[SOCIAL_SECURITY_ID_x]` |
+| **Basic Personal Data** | `HEALTH_INSURANCE_ID`| Điều 2 Khoản 3: Mã thẻ bảo hiểm y tế (BHYT) | 15-character national health insurance codes | `[HEALTH_INSURANCE_ID_x]` |
+| **Basic Personal Data** | `LICENSE_PLATE` | Điều 2 Khoản 3: Biển số xe cơ giới | Vietnamese automotive and motorcycle license plates | `[LICENSE_PLATE_x]` |
+| **Basic Personal Data** | `PHONE_NUMBER` | Điều 2 Khoản 3: Số điện thoại di động | Vietnamese telecommunication prefixes (`03`, `05`, `07`, `08`, `09`, `+84`) | `[PHONE_NUMBER_x]` |
+| **Basic Personal Data** | `EMAIL` | Điều 2 Khoản 3: Địa chỉ thư điện tử | Standard RFC-compliant email address format | `[EMAIL_x]` |
+| **Basic Personal Data** | `IP_ADDRESS` | Điều 2 Khoản 3: Địa chỉ giao thức mạng Internet (IPv4) | Dotted-quad IPv4 network addresses | `[IP_ADDRESS_x]` |
+| **Basic Personal Data** | `MAC_ADDRESS` | Điều 2 Khoản 3: Địa chỉ phần cứng thiết bị mạng | Colon/hyphen-separated 6-byte hexadecimal MAC addresses | `[MAC_ADDRESS_x]` |
+
+### 2. Collision-Free Right-to-Left (RTL) Span Offset Replacement
+
+Naive substring replacement (`text.replace(match, token)`) causes corruption when matched strings overlap or appear as substrings of larger identifiers. The engine applies an exact non-overlapping span offset algorithm:
+
+1. **Regex Detection**: Scans the text across all 17 entity patterns and records `(start_index, end_index, entity_code, matched_text)`.
+2. **Overlap Resolution**: Sorts detected spans by descending priority (Sensitive Data > Basic Data) and length, pruning conflicting spans.
+3. **Right-to-Left Mutation**: Mutates the text strictly from highest string offset down to index `0`, guaranteeing that replacing earlier characters does not invalidate offsets of subsequent substrings.
+4. **Reversible Token Mapping**: Maintains a volatile request-scoped `pii_mapping` dictionary (`{ "[CITIZEN_ID_1]": "079123456789" }`) in application memory to seamlessly restore entities into final human-readable summaries (`unmask_text`) while sending strictly sanitized tokens to the LLM.
+
+### 3. Multimodal OCR 2-Stream Image Redaction
+
+When invoices, banking slips, or receipts are provided as Base64 images:
+* **Stream 1 (Visual Blackout)**: Tesseract OCR extracts bounding box coordinates (`x, y, w, h`) for every word. If a word or sequence matches a PII entity, Pillow draws a solid fill rectangle over the pixels, generating a redacted image preview for the user interface.
+* **Stream 2 (Text Sanitization)**: Extracted OCR text is piped through the text PII masking engine and injected into the prompt context with isolated namespace tokens (`[OCR_CITIZEN_ID_1]`).
+
+### 4. Rule-Based Prompt Injection Shield
+
+Incoming prompts are verified against injection vectors (`ignore previous instructions`, `reveal system prompt`, `DAN mode`, `bypass safety filters`) before reaching the vector cache or LLM. Responses are validated against system instruction leakage before delivery.
 
 ---
 
-## Structured Output Parsing & Pydantic Schema Validation
+## Core API Contracts & Storage Schemas
 
-To prevent downstream parsing crashes when consuming LLM outputs, the gateway integrates `output_validator.py`:
+### 1. Chat Completions (`POST /v1/chat/completions`)
 
-```mermaid
-flowchart TD
-    raw_resp["Raw LLM Output Stream"] --> extractor["1. JSON Codeblock Extractor & Syntax Fixer"]
-    extractor --> parse_attempt["2. Safe JSON Decoding"]
-    parse_attempt --> pydantic_val["3. Pydantic Declarative Schema Validation<br/>(FinancialTransactionSchema)"]
-    pydantic_val -->|Valid Types, Enum & Math Balance| serve_client["200 OK Response with Structured Data"]
-    pydantic_val -->|Validation Warning / Type Imbalance| safe_resp["200 OK Response with Error Metadata"]
-```
+The serving layer adheres to OpenAI API conventions with extended security metadata:
 
----
-
-## REST API Serving Data Contract (`/v1/chat/completions`)
-
-The gateway implements standard OpenAI-compatible specifications with execution metadata:
-
-### Request Contract
+#### Request Contract
 ```json
 {
-  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "model": "auto",
   "messages": [
     {
       "role": "user",
-      "content": "Chuyển 5,000,000 VND từ tài khoản 19034567890123 đến STK 0071001234567 tại Vietcombank cho Nguyen Van A."
+      "content": "Chuyển 5.000.000 VND từ CCCD 079123456789 số thẻ 4111222233334444 cho số điện thoại 0901234567"
     }
   ],
-  "temperature": 0.1,
+  "temperature": 0.2,
   "max_tokens": 512
 }
 ```
 
-### Response Contract (< 5ms on Cache Hit)
+#### Response Contract (< 5ms on Cache Hit)
 ```json
 {
-  "request_id": "req-7f8a9b2c-1234-5678-9abc-def012345678",
+  "request_id": "req-8f4b23a91c4e",
   "status": "success",
   "meta": {
-    "execution_time_ms": 142.5,
-    "pii_redacted_count": 2,
+    "execution_time_ms": 3.84,
+    "pii_redacted_count": 3,
     "cached_hit": false,
     "json_auto_repaired": false,
     "schema_validated": true,
@@ -169,157 +197,230 @@ The gateway implements standard OpenAI-compatible specifications with execution 
   "formats": {
     "structured_data": {
       "transaction_type": "TRANSFER",
-      "amount": 5000000,
+      "amount": 5000000.0,
       "currency": "VND",
-      "sender_account": "<BANK_ACCOUNT_NUMBER>",
-      "receiver_account": "<BANK_ACCOUNT_NUMBER>",
-      "receiver_name": "<PERSON>"
+      "sender_account": "4111222233334444",
+      "receiver_name": "0901234567"
     },
-    "text_summary": "Giao dịch chuyển 5,000,000 VND từ tài khoản <BANK_ACCOUNT_NUMBER> đã được trích xuất thành công."
+    "text_summary": "Đã thực hiện giao dịch chuyển tiền 5.000.000 VND từ CCCD 079123456789 số thẻ 4111222233334444 cho số điện thoại 0901234567."
   }
 }
 ```
 
 ---
 
-## Pipeline Workflow
+### 2. Pydantic Structured Output Contract (`FinancialTransactionSchema`)
 
-### 1. Offline 3-Stage Foundation Model Adaptation
-* **Stage 1 - Dataset Validation (`training/src/dataset_validator.py`):** Ingests raw JSONL data, verifies structural ChatML schema rules, audits PII distributions, and materializes canonical splits (`training/data/processed/`).
-* **Stage 2 - QLoRA SFT Engine (`training/src/train_engine.py`):** Loads base model (`Qwen/Qwen2.5-0.5B-Instruct`) in 4-bit NF4 precision via BitsAndBytes, initializes base model memory footprint (~1.03GB on disk/VRAM), binds LoRA adapters ($r=16, \alpha=32$), and executes training cycles.
-* **Stage 3 - Evaluation & Manifest Export (`training/src/eval_engine.py` & `manifest_builder.py`):** Evaluates Base Zero-Shot vs LoRA Fine-Tuned JSON structural validity and schema compliance. Generates `artifacts/runs/dev/manifest.json` and adapter metadata.
+To eliminate numerical hallucinations and formatting bugs, JSON outputs are validated via Pydantic:
 
-### 2. Online Gateway Request Processing
-* **PII Ingestion & Redaction:** Incoming prompts pass through `presidio_engine.py` to mask sensitive entities into standard tokens (`<VIETNAMESE_CITIZEN_ID>`, `<BANK_ACCOUNT_NUMBER>`).
-* **Low-Latency Semantic Vector Caching:** Binds N-gram hash vectors and checks Redis for semantically identical queries ($\text{cosine similarity} \ge 0.90$). Returns cached responses rapidly on cache hits.
-* **Intent Routing:** On cache misses, `intent_router.py` analyzes prompt keywords and regex patterns against active manifests, selecting either the base model or dynamic LoRA adapter (`financial_adapter`).
-* **Guardrails Defense:** Validates prompt safety against jailbreak attempts and prompt injection vectors.
-* **Inference Serving:** Dispatches sanitized payloads via standard HTTP client to the OpenAI-compatible inference host (`Ollama`, `vLLM`, or inference server).
-* **Output Parsing & Validation:** Sanitizes raw output and verifies structural contracts via Pydantic model (`output_validator.py`).
-* **Asynchronous Audit Logging:** Emits non-blocking audit logs (containing request metadata, redacted entities, latency, and status) directly to Neon Serverless PostgreSQL Cloud.
+```python
+class FinancialTransactionSchema(BaseModel):
+    transaction_type: str | None = Field(default="TRANSACTION")
+    amount: float | None = Field(default=None, ge=0.0)
+    currency: Literal["VND", "USD", "EUR", "JPY", ""] | None = "VND"
+    sender_name: str | None = None
+    sender_account: str | None = None
+    receiver_name: str | None = None
+    receiver_account: str | None = None
+    subtotal: float | None = Field(default=None, ge=0.0)
+    tax: float | None = Field(default=None, ge=0.0)
+    total: float | None = Field(default=None, ge=0.0)
+
+    @model_validator(mode="after")
+    def verify_math_balance(self) -> "FinancialTransactionSchema":
+        """Declaratively verifies arithmetic consistency: subtotal + tax == total."""
+        if self.subtotal is not None and self.tax is not None and self.total is not None:
+            expected = round(self.subtotal + self.tax, 2)
+            if abs(expected - round(self.total, 2)) > 0.01:
+                raise ValueError(
+                    f"Arithmetic imbalance: subtotal ({self.subtotal}) + tax ({self.tax}) = {expected}, but total is {self.total}"
+                )
+        return self
+```
+
+* If an LLM returns malformed JSON with trailing commas or unescaped quotes, `json-repair` recovers the JSON tree before schema validation.
+
+---
+
+### 3. Neon PostgreSQL Cloud Audit Schema (`audit_logs`)
+
+All requests are logged asynchronously via background tasks (`asyncpg` connection pool) without degrading response latency:
+
+| Column Name | SQL Type | Nullable | Description |
+| :--- | :--- | :---: | :--- |
+| `id` | `SERIAL PRIMARY KEY` | No | Auto-incrementing audit log identifier |
+| `request_id` | `VARCHAR(64)` | No | Indexed unique identifier for tracing (`idx_audit_request_id`) |
+| `client_ip` | `VARCHAR(64)` | Yes | Originating client IP address |
+| `masked_prompt` | `TEXT` | Yes | PII-sanitized prompt payload (never logs raw PII) |
+| `model_id` | `VARCHAR(128)` | Yes | Active model or adapter ID resolved by the router |
+| `response_formats` | `JSONB` | Yes | Sanitized structured and textual response payload |
+| `pii_count` | `INT` | No | Number of PII entities detected and redacted |
+| `cached_hit` | `BOOLEAN` | No | Cache hit flag (`TRUE` = served from Redis HNSW) |
+| `execution_time_ms`| `FLOAT` | No | End-to-end gateway execution latency in milliseconds |
+| `status_code` | `INT` | No | HTTP status code returned to client |
+| `created_at` | `TIMESTAMPTZ` | No | Indexed UTC timestamp of the request (`idx_audit_created_at`) |
+
+---
+
+## Offline Foundation Model Adaptation Pipeline (MLOps)
+
+The repository provides a modular, reproducible 3-stage offline pipeline for training and packaging domain-specific LoRA adapters:
+
+```
+[Raw JSONL Dataset] ──► [Stage 1: Dataset Validator] ──► [Stage 2: QLoRA Train Engine] ──► [Stage 3: Eval Engine] ──► [manifest.json Contract]
+```
+
+### Stage 1: Dataset Canonicalization & PII Audit (`training/src/dataset_validator.py`)
+* Validates schema format (`instruction`, `input`, `output`), performs deduplication via MD5 hash registry, conducts PII leakage screening, and generates deterministic train/val splits (e.g., 90/10).
+
+### Stage 2: Contract-First SFT / QLoRA Engine (`training/src/train_engine.py`)
+* Supports `--dry-run` to validate tokenizer token budgets and estimate GPU VRAM consumption.
+* Executes 4-bit quantized Low-Rank Adaptation (QLoRA) using HuggingFace `peft` and `bitsandbytes`, saving adapter weights to `artifacts/runs/<run_id>/adapter/`.
+
+### Stage 3: Offline 4-Way Evaluation & Manifest Packaging (`training/src/eval_engine.py`)
+* Computes JSON validity rate, Pydantic schema compliance rate, and field-level key extraction accuracy.
+* Packages artifacts with an MLOps `manifest.json` contract that the online gateway automatically discovers on boot.
+
+---
+
+## End-to-End System Workflow
+
+```
+[Client / UI Request] ──► [Prompt Guardrails] ──► [Decree 13 PII Redaction] ──► [HNSW Semantic Cache] ──► [LoRA Intent Router] ──► [vLLM Serving Host] ──► [Pydantic Validation & Auto-Repair] ──► [Neon Audit & Metrics]
+```
+
+### 1. Request Ingestion & Security Guardrails
+* The client sends a request to `POST /v1/chat/completions` with an `X-API-Key` header.
+* `GuardrailsEngine` inspects the prompt against jailbreak and system instruction leakage patterns.
+
+### 2. Multimodal OCR & Non-Overlapping PII Redaction
+* If images are attached, `PresidioPIIEngine` applies Tesseract OCR and draws visual blackout rectangles.
+* The text stream is scanned across 17 Decree 13 entity definitions. Entities are replaced using Right-to-Left span replacement, populating a volatile token mapping.
+
+### 3. Native RediSearch HNSW Vector Caching (Sub-5ms SLA)
+* Sanitized text is hashed into a 128-dimensional embedding and queried against Redis Stack via `FT.SEARCH` with Cosine distance.
+* **Cache Hit**: Gateway unmasks tokens and immediately returns the cached payload under 5ms, offloading compute from vLLM.
+* **Cache Miss**: Request proceeds to the Intent Router.
+
+### 4. Dynamic LoRA Intent Routing & Manifest Auto-Discovery
+* `IntentRouter` evaluates keywords and regex patterns or reads explicit `model` parameters.
+* Resolves whether to route to the base model (`Qwen2.5-0.5B-Instruct`) or a specialized LoRA adapter (`financial_adapter`).
+
+### 5. vLLM Serving & Pydantic Auto-Repair Validation
+* The gateway calls vLLM with sanitized messages.
+* Raw completion is parsed: if syntax errors exist, `json-repair` automatically recovers valid JSON.
+* Output is validated against `FinancialTransactionSchema` (verifying `subtotal + tax == total`).
+* Entities are restored into the textual summary using the request-scoped mapping.
+
+### 6. Asynchronous Cloud Audit Logging & Telemetry
+* Background task dispatches sanitized audit trail to Neon PostgreSQL pool.
+* Background task stores sanitized response in Redis Stack HNSW cache.
+* Prometheus metrics counter and latency histograms are updated at `/metrics`.
 
 ---
 
 ## Key Engineering Highlights
 
-* **Localized PII Redaction Filter:** 17 Vietnamese entity recognizers providing pre-inference regex, checksums, and Presidio redaction for sensitive personal and financial data.
-* **Semantic Vector Caching:** Cosine similarity vector search over Redis cuts redundant LLM calls and reduces token consumption on frequent queries.
-* **Structured Output Validation & Repair:** Pydantic schema validation combined with JSON regex auto-repair eliminates downstream API parsing errors.
-* **Zero-Touch LoRA Manifest Hot-Reloading:** Dynamic intent router detects newly trained adapters from `artifacts/runs/*/manifest.json` at runtime without gateway downtime.
-* **4-bit NF4 QLoRA Adaptation:** Quantizes base model weight footprint to $\approx 1.03\text{GB}$, enabling parameter-efficient SFT on consumer GPUs.
-* **Serverless Cloud Audit Logging:** Non-blocking async connection pooling to Neon Cloud PostgreSQL with SSL/TLS encryption for structured audit trails.
-
----
-
-## Empirical Evaluation & Concurrency Benchmarks
-
-The platform has been empirically benchmarked across adaptation strategies, inference accuracy, serving latency, and multi-tenant concurrency (source: `artifacts/runs/dev/eval/4way_benchmark.json` & `artifacts/runs/dev/benchmark/concurrency_benchmark.json`):
-
-### 1. 4-Way Foundation Model Adaptation Benchmark
-*Evaluated on Vietnamese financial transaction extraction tasks (Micro-Batch Functional Verification, `val_sample_count=2`):*
-
-| Serving Strategy | Description | JSON Schema Validity | Field-Level Accuracy | Avg Latency (Real Inference) |
-| :--- | :--- | :---: | :---: | :---: |
-| **Tier 1: Base Zero-Shot** | `Qwen2.5-0.5B-Instruct` (Zero-shot prompt) | 0.0% | 0.0% | 4,195.1 ms |
-| **Tier 2: Base 3-Shot** | `Qwen2.5-0.5B-Instruct` (3 in-context examples) | 0.0% | 0.0% | 2,240.8 ms |
-| **Tier 3: LoRA Adapter (BF16)** | Fine-Tuned LoRA Adapter ($r=16, \alpha=32$) | **100.0%** | **17.36% (Exact Match)** | **1,868.0 ms** |
-| **Tier 4: LoRA Merged + AWQ INT4** | Merged Adapter + AWQ 4-bit Quantized | **100.0%** | **17.36% (Exact Match)** | **1,937.3 ms** |
-
-> **Key Takeaway:** Fine-tuned LoRA adaptation transformed JSON validity from **0.0% (Base)** to **100.0% (LoRA)**, eliminating schema parsing failures on structured extraction tasks.
-
-### 2. Live Serving & Concurrency Benchmark Matrix
-*Evaluated on live inference endpoints across concurrency levels $C \in \{1, 2, 4\}$ (Smoke Verification, `sample_requests_count=3` per concurrency tier):*
-
-| Strategy | Description | Target Use Case | GPU VRAM Footprint | Throughput ($C=1$) | TTFT p95 ($C=1$) | ITL p95 ($C=1$) | p99 Latency ($C=1$) |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Strategy 1: Dedicated Merged AWQ** | Standalone AWQ 4-bit Serving | Single-tenant high-throughput transaction API | **0.8 GB** | **63.5 tok/s** | 1,068.8 ms | 14.52 ms | 1,543.2 ms |
-| **Strategy 2: Dynamic Multi-LoRA** | 1 Base Model + Multi-LoRA (`--enable-lora`) | Multi-tenant gateway hosting 20+ specialized adapters | **1.4 GB** (Hot-swap: 2.1ms) | **60.9 tok/s** | 1,113.2 ms | 15.25 ms | 1,609.3 ms |
-
----
-
-## Edge Cases & Resiliency Matrix
-
-| Failure Mode / Edge Case | System Impact | Implemented Resiliency & Mitigation |
-| :--- | :--- | :--- |
-| **Presidio False Negative on Unstructured PII** | Complex Vietnamese address or informal slang escapes NER. | **Defense-in-Depth:** Multi-tier entity pipeline combining regex pattern recognizers, Spacy statistical NER, and strict Prompt Guardrail instructions. |
-| **LLM Output Missing Trailing JSON Brackets** | Downstream JSON deserialization fails with `JSONDecodeError`. | **JSON Auto-Repair:** `output_validator.py` detects truncated delimiters, auto-balances braces (`}`, `]`), and extracts valid JSON blocks prior to Pydantic validation. |
-| **Redis Cache Connectivity Interruption** | Semantic cache lookups fail due to transient network drops. | **Graceful Cache Bypass:** Gateway logs a warning, transparently bypasses the cache layer, and forwards the sanitized prompt directly to the inference host without returning a 500 error. |
-| **Adapter Manifest Race Condition on Hot-Reload** | Manifest is modified during concurrent gateway routing requests. | **Atomic Manifest Snapshot:** `IntentRouter` reads the manifest with atomic file locking and caches the parsed routing state, avoiding corrupted in-flight reads. |
+* **Decree 13/2023/NĐ-CP Compliant Privacy Engine:** Complete coverage of 17 localized Vietnamese PII entity types, structured across Basic Personal Data (Điều 2 Khoản 3) and Sensitive Personal Data (Điều 2 Khoản 4).
+* **Right-to-Left Non-Overlapping Span Replacement:** Eliminates substring corruption bugs and race conditions common in naive text substitution.
+* **Sub-5ms HNSW Semantic Vector Caching:** Native Redis Stack RediSearch vector indexing offloads repetitive inference calls with sub-5ms response latency.
+* **Zero-Touch LoRA Manifest Auto-Discovery:** Seamlessly discovers, validates, and registers fine-tuned LoRA adapters directly from `manifest.json` files without restarting the gateway.
+* **Declarative Financial Math Balancing:** Pydantic `model_validator` checks verify line-item arithmetic consistency (`subtotal + tax == total`), eliminating LLM calculation hallucinations.
+* **Automated Syntax Recovery via `json-repair`:** Recovers malformed JSON from raw LLM outputs (unclosed quotes, trailing commas) without triggering API 500 exceptions.
+* **Non-Blocking Cloud Compliance Logging:** Asynchronously writes sanitized audit records to Neon Serverless PostgreSQL with SSL/TLS, ensuring zero impact on user-facing latency.
+* **3-Stage Contract-First QLoRA Adaptation Pipeline:** Modular offline training pipeline supporting `--dry-run` VRAM estimation, contract validation, and 4-way evaluation.
+* **Interactive Web Cockpit & Real-time Metrics:** Modern dark-mode UI for testing text/image redaction alongside native Prometheus metric exports at `/metrics`.
 
 ---
 
 ## Project Structure
 
 ```
-GATEWAY/
+llm-serving-gateway/
 │
-├── docker-compose.yml                 # Gateway & Redis infrastructure orchestration
-├── conftest.py                        # Root test fixtures and path discovery
+├── docker-compose.yml                 # Gateway, vLLM, Redis Stack & Prometheus orchestration
+├── conftest.py                        # Root sys.path & pytest fixtures
 ├── pytest.ini                         # Pytest runner configuration
-├── requirements.txt                   # Platform dependencies
+├── requirements.txt                   # Production dependencies manifest
 ├── .env.example                       # Environment configuration template
-├── .env                               # Active environment variables
 │
-├── gateway/                           # Online FastAPI Security Gateway & Web Cockpit
-│   ├── Dockerfile                     # Gateway containerization manifest
+├── gateway/                           # Online FastAPI Serving Gateway & Web Cockpit
+│   ├── Dockerfile                     # Containerization build manifest
 │   └── app/
-│       ├── main.py                    # FastAPI application entrypoint & routing endpoints
-│       ├── config/
+│       ├── main.py                    # FastAPI entrypoint, lifespan & OpenAI-compatible routes
+│       ├── config/                    # Centralized settings package (pydantic-settings)
 │       │   ├── __init__.py
-│       │   └── settings.py            # Pydantic BaseSettings & auto-bootstrapping runtime directories
+│       │   └── settings.py            # Centralized settings & Pathlib directory resolver
 │       │
-│       ├── core/                      # Gateway core security & optimization engines
-│       │   ├── presidio_engine.py     # Microsoft Presidio PII redaction filter (17 entity types)
-│       │   ├── semantic_cache.py      # Low-latency Redis vector semantic cache (Cosine similarity)
+│       ├── core/                      # Core security, caching, routing & validation engines
+│       │   ├── presidio_engine.py     # Decree 13 PII redaction engine & multimodal OCR
+│       │   ├── semantic_cache.py      # Native RediSearch HNSW Vector Cache & L1 LRU
 │       │   ├── intent_router.py       # Dynamic intent classifier & manifest auto-discovery
 │       │   ├── output_validator.py    # Structured Output Parser & Pydantic Schema Validator
-│       │   └── guardrails_engine.py   # Guardrails prompt injection & jailbreak defense
+│       │   └── guardrails_engine.py   # Guardrails prompt injection & leakage defense
 │       │
-│       ├── db/                        # Database client & persistence layer
-│       │   └── neon_audit_logger.py   # Asynchronous Neon Serverless PostgreSQL audit logger
+│       ├── db/
+│       │   └── neon_audit_logger.py   # Asynchronous Neon PostgreSQL audit logger (SSL/TLS)
 │       │
-│       ├── static/                    # Interactive Web Playground Cockpit
-│       │   ├── index.html             # Cockpit UI interface
-│       │   ├── style.css              # Cockpit styling
-│       │   └── app.js                 # Frontend API handler & state manager
+│       ├── static/                    # Interactive Web Playground & Security Cockpit
+│       │   ├── index.html             # Split-panel cockpit UI (Input, Output, OCR, Metadata)
+│       │   ├── style.css              # Dark-tech theme stylesheet
+│       │   └── app.js                 # Reactive frontend controller
 │       │
-│       └── utils/                     # Shared gateway utilities
-│           ├── __init__.py
-│           └── logger.py              # ISO standardized color-coded logging utility
+│       └── utils/
+│           └── logger.py              # Centralized ISO-8601 logger
 │
-├── training/                          # Offline Foundation Model Adaptation Pipeline
-│   ├── run_pipeline.py                # CLI Orchestrator Entrypoint (--dry-run, --smoke-test, --train)
-│   ├── configs/                       # Declarative YAML training configurations
-│   │   └── dev.yaml                   # Base model, QLoRA hyperparameters & routing patterns
-│   │
-│   ├── data/                          # Dataset staging directory
-│   │   ├── raw/                       # Raw financial transaction JSONL datasets
-│   │   └── processed/                 # Canonical validated ChatML train/val splits
-│   │
+├── training/                          # Offline Foundation Model Adaptation Pipeline (MLOps)
+│   ├── run_pipeline.py                # CLI Orchestrator (--dry-run, --smoke-test, --stage)
+│   ├── configs/
+│   │   └── dev.yaml                   # QLoRA hyperparameters, dataset & routing metadata
+│   ├── data/
+│   │   └── raw/                       # Raw financial transaction JSONL datasets
 │   └── src/                           # Modular adaptation pipeline engines
-│       ├── config_schema.py           # Pydantic v2 pipeline schema & path resolution
-│       ├── dataset_validator.py       # Stage 1: ChatML format validation & PII distribution audit
-│       ├── train_engine.py            # Stage 2: QLoRA 4-bit SFT Engine with BitsAndBytes
-│       ├── eval_engine.py             # Stage 3: Evaluation engine (Base vs LoRA JSON validity)
+│       ├── config_schema.py           # Pipeline YAML configuration schema
+│       ├── dataset_validator.py       # Stage 1: Dataset canonicalization, dedup & PII audit
+│       ├── train_engine.py            # Stage 2: Contract-first QLoRA adapter training engine
+│       ├── eval_engine.py             # Stage 3: Offline 4-way evaluation engine
 │       ├── manifest_builder.py        # Manifest builder & contract publisher
 │       └── utils/
 │           └── logger.py              # Training pipeline logger
 │
-├── artifacts/                         # Run Artifacts & Production Contracts
-│   └── runs/                          # Saved model checkpoints & LoRA adapter weights
-│       └── dev/
-│           ├── manifest.json          # Production metadata contract for zero-touch routing
-│           └── adapter/               # Exported LoRA adapter weights & metadata
+├── tests/                             # Comprehensive Modular Test Suite (pytest)
+│   ├── test_decree13_pii_engine.py    # Decree 13 entity masking, unmasking & collision tests
+│   ├── test_foundation_model_pipeline.py # 3-Stage adaptation pipeline & manifest contract tests
+│   ├── test_gateway_core_engines.py   # Guardrails, cache similarity, schema & math balance tests
+│   ├── test_gateway_e2e_pipeline.py   # End-to-end gateway authentication, OCR & injection tests
+│   ├── test_infrastructure_config.py  # Docker compose, env example & requirements tests
+│   ├── test_model_routing_live.py     # Intent router logic & live routing tests
+│   └── test_telemetry_observability.py # Health, Prometheus metrics & Neon audit schema tests
 │
-└── tests/                             # Automated Unit & Integration Test Suites
-    ├── test_foundation_model_pipeline.py # Tests for 3-stage training, eval, and manifest export
-    ├── test_decree13_pii_engine.py       # Tests for 17 localized PII entity recognizers
-    ├── test_gateway_core_engines.py      # Tests for cache, intent router, output validator, guardrails
-    ├── test_gateway_e2e_pipeline.py      # End-to-end integration tests for /v1/chat/completions
-    ├── test_infrastructure_config.py     # Tests for environment settings and path bootstrapping
-    ├── test_model_routing_live.py        # Live adapter routing verification
-    └── test_telemetry_observability.py   # Health endpoint and audit logging tests
+├── artifacts/                         # Generated model runs & manifest contracts (local)
+└── logs/                              # Application execution logs
 ```
+
+---
+
+## Environment Configuration Reference
+
+The platform utilizes centralized Pydantic Settings (`gateway/app/config/settings.py`) loaded from `.env`:
+
+| Variable | Category | Type | Default Value | Description |
+| :--- | :--- | :---: | :--- | :--- |
+| `VLLM_BASE_URL` | Serving Host | `str` | `http://localhost:8000/v1` | Base URL for OpenAI-compatible vLLM inference server |
+| `VLLM_MODEL_NAME` | Serving Host | `str` | `Qwen/Qwen2.5-0.5B-Instruct` | Target foundation model identifier |
+| `HF_TOKEN` | Serving Host | `str` | `None` | HuggingFace Hub token for gated model downloads |
+| `REDIS_HOST` | Cache / Vector | `str` | `localhost` | Redis Stack server host address |
+| `REDIS_PORT` | Cache / Vector | `int` | `6379` | Redis Stack server port |
+| `REDIS_PASSWORD` | Cache / Vector | `str` | `None` | Optional password for Redis authentication |
+| `SEMANTIC_CACHE_THRESHOLD` | Cache / Vector | `float` | `0.95` | Cosine similarity threshold for semantic cache hit (0.0–1.0) |
+| `SEMANTIC_CACHE_TTL_SECONDS` | Cache / Vector | `int` | `86400` | Expiration time for cached prompt entries in seconds (24h) |
+| `GATEWAY_HOST` | Gateway Core | `str` | `0.0.0.0` | Listening host for FastAPI gateway |
+| `GATEWAY_PORT` | Gateway Core | `int` | `8080` | Listening port for FastAPI gateway |
+| `GATEWAY_API_KEY` | Security | `str` | `secret_ai_gateway_key_2026` | Shared secret API key for `X-API-Key` authentication |
+| `NEON_DATABASE_URL` | Audit DB | `str` | `""` | Neon Serverless PostgreSQL connection URL with SSL mode |
+| `GRAFANA_CLOUD_REMOTE_WRITE_URL` | Observability | `str` | `""` | Optional Grafana Cloud Prometheus remote write URL |
+| `GRAFANA_CLOUD_USER` | Observability | `str` | `""` | Grafana Cloud username for metrics push |
+| `GRAFANA_CLOUD_API_KEY` | Observability | `str` | `""` | Grafana Cloud API key for authentication |
 
 ---
 
@@ -328,56 +429,80 @@ GATEWAY/
 ### 1. Clone and Configure Environment
 
 ```bash
-git clone <your-repo-url>
-cd GATEWAY
+# Clone the repository
+git clone https://github.com/hovngnvm/llm-serving-gateway.git
+cd llm-serving-gateway
+
+# Copy template configuration
 cp .env.example .env
-# Edit .env to set your GATEWAY_API_KEY and database credentials
+# Edit .env with your credentials (Neon Database URL, Hugging Face Token, API Key)
 ```
 
-### 2. Launch Gateway Infrastructure (Docker Compose)
-
-Start the Security Gateway, Web Playground Cockpit, and Redis vector cache:
+### 2. Setup Python Virtual Environment
 
 ```bash
-docker compose up -d
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install platform dependencies
+pip install -r requirements.txt
 ```
 
-Verify endpoints:
-* **Web Playground Cockpit:** `http://localhost:8080/`
+### 3. Run Automated Test Suite Verification
+
+Verify core security engines, HNSW caching, Pydantic math balance, and E2E routes:
+
+```bash
+pytest -v
+```
+
+### 4. Launch Infrastructure Services (Docker)
+
+Boot up Redis Stack (vector cache & RedisInsight) and Prometheus:
+
+```bash
+docker compose up -d redis-cache prometheus
+```
+
+*Verify service status:*
+* **RedisInsight Dashboard:** `http://localhost:8001`
+* **Prometheus Server:** `http://localhost:9090`
+
+*(Optional) Start local GPU vLLM serving container:*
+```bash
+docker compose up -d vllm-server
+```
+
+### 5. Start AI Serving Gateway Server
+
+```bash
+python -m uvicorn gateway.app.main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+*Access interactive service interfaces:*
+* **Interactive Playground Cockpit:** `http://localhost:8080/` (or `/playground`)
 * **Swagger API Documentation:** `http://localhost:8080/docs`
-* **Gateway Health & Observability:** `http://localhost:8080/health`
-* **Redis Dashboard:** `http://localhost:8001/`
+* **Prometheus Metrics:** `http://localhost:8080/metrics`
+* **Health & Cache Diagnostics:** `http://localhost:8080/health`
 
-### 3. Execute Foundation Model Adaptation Pipeline (CLI)
+### 6. Run Offline Adaptation Pipeline (QLoRA & Contract Verification)
 
-The adaptation pipeline provides 3 execution modes:
+Execute the 3-stage offline pipeline to validate datasets, run QLoRA SFT, and export manifest contracts:
 
-#### 3.1 Dry-Run Validation (Graph & VRAM Verification in 1s)
-Validates configuration schema, dataset paths, and GPU memory compatibility without loading model weights:
 ```bash
+# Dry-run validation (Dataset format, token budget & VRAM estimation)
 python -m training.run_pipeline --config training/configs/dev.yaml --dry-run
-```
 
-#### 3.2 Smoke-Test (End-to-End 3-Stage Cycle in 4s)
-Runs an end-to-end verification cycle across Validation $\rightarrow$ SFT $\rightarrow$ Evaluation $\rightarrow$ Manifest Export on a micro-batch:
-```bash
+# End-to-end contract verification, LoRA adapter generation & manifest packaging
 python -m training.run_pipeline --config training/configs/dev.yaml --smoke-test
 ```
 
-#### 3.3 Full QLoRA Training Execution
-Executes full 4-bit QLoRA fine-tuning, calculates evaluation metrics, and exports adapter weights to `artifacts/runs/dev/adapter/`:
-```bash
-python -m training.run_pipeline --config training/configs/dev.yaml --train
-```
+### 7. Explore Interactive Web Playground & Cockpit
 
-### 4. Run Automated Test Suites
-
-Run the full test suite across all security engines, training pipeline, and API endpoints:
-
-```bash
-python -m unittest discover tests
-```
-or with pytest:
-```bash
-pytest tests/ -v
-```
+Navigate to **`http://localhost:8080/`** in your browser to test:
+* **Decree 13 PII Redaction:** Try the pre-filled quick prompts for banking, invoices, or personal data.
+* **Multimodal Image OCR:** Upload a transaction slip to test real-time pixel blackout and OCR entity masking.
+* **Semantic Caching:** Resubmit identical queries to verify `< 5ms` cache hit responses.
+* **Math Balance Rejection:** Verify that mathematically inconsistent invoices are rejected or flagged.
+* **Prompt Injection Shield:** Submit jailbreak patterns to test immediate 400 Bad Request rejection.
