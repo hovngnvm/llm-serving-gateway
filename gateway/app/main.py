@@ -28,14 +28,11 @@ logger = get_logger(__name__)
 
 MAX_OUTPUT_TOKENS_CEILING = 512
 DEFAULT_FALLBACK_IP = "127.0.0.1"
-MARKDOWN_INDICATORS = ["```", "#", "|", "**", "- ", "\n1.", "\n* ", "__"]
-DEFAULT_ROUTING_STRATEGY = "Strategy 2 (Dynamic Multi-LoRA)"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     ensure_directories()
-    # Singleton HTTP Async Client with connection pooling
     app.state.http_client = httpx.AsyncClient(
         timeout=httpx.Timeout(connect=3.0, read=60.0, write=10.0, pool=10.0),
         limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
@@ -43,7 +40,6 @@ async def lifespan(app: FastAPI):
     logger.info("AI Serving & Security Gateway initialized with connection pooling.")
     try:
         await neon_audit_logger.init_db()
-        logger.info("Neon Serverless PostgreSQL Cloud connection verified.")
     except Exception as e:
         logger.warning(f"Neon DB initialization notice: {e}")
     yield
@@ -58,7 +54,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Prometheus Telemetry Instrumentation (Mandatory Core Service)
 Instrumentator().instrument(app).expose(app, endpoint=settings.prometheus_metrics_path)
 
 if STATIC_DIR.exists():
@@ -113,50 +108,12 @@ async def health_check() -> dict[str, Any]:
     }
 
 
-class RegisterAdapterRequest(BaseModel):
-    adapter_name: str
-    description: str
-    keywords: list[str]
-    regex_patterns: list[str] | None = None
-    strategy: str | None = DEFAULT_ROUTING_STRATEGY
-    priority: int | None = 10
-
-
 @app.get("/v1/models")
 async def list_available_models() -> dict[str, Any]:
     """Returns dynamic model inventory and active serving strategies."""
     return {
         "object": "list",
         "data": intent_router.get_registered_models()
-    }
-
-
-@app.post("/v1/models/register", dependencies=[Depends(verify_api_key)])
-async def register_new_adapter(req: RegisterAdapterRequest) -> dict[str, Any]:
-    """Dynamically registers a newly exported LoRA adapter at runtime (Zero-Touch)."""
-    intent_router.register_adapter(
-        target_model=req.adapter_name,
-        description=req.description,
-        keywords=req.keywords,
-        regex_patterns=req.regex_patterns,
-        strategy=req.strategy or DEFAULT_ROUTING_STRATEGY,
-        priority=req.priority or 10,
-    )
-    return {
-        "status": "success",
-        "message": f"Adapter '{req.adapter_name}' successfully registered into Intent Router.",
-        "registered_adapters_count": len(intent_router.rules),
-    }
-
-
-@app.post("/v1/models/refresh", dependencies=[Depends(verify_api_key)])
-async def refresh_adapters_from_artifacts() -> dict[str, Any]:
-    """Auto-scans artifacts/runs/ for new manifest.json files and loads new adapters."""
-    count = intent_router.auto_discover_from_artifacts()
-    return {
-        "status": "success",
-        "message": f"Auto-discovery scanned artifacts/runs/. Discovered and loaded {count} new adapter manifests.",
-        "total_active_adapters": len(intent_router.rules),
     }
 
 
@@ -172,18 +129,40 @@ async def chat_completions(
 
     raw_prompt = ""
     raw_image_b64 = ""
+    masked_messages = []
+    pii_mapping: dict[str, str] = {}
+    total_pii_count = 0
+
     for msg in request_data.messages:
-        if isinstance(msg.content, str):
-            raw_prompt += msg.content + "\n"
-        elif isinstance(msg.content, list):
-            for part in msg.content:
-                if isinstance(part, dict):
-                    if part.get("type") == "text":
-                        raw_prompt += part.get("text", "") + "\n"
-                    elif part.get("type") == "image_url":
-                        img_url = part.get("image_url", {}).get("url", "")
-                        if "base64" in img_url:
-                            raw_image_b64 = img_url
+        role = msg.role
+        content = msg.content
+        if isinstance(content, str):
+            masked_text, m_map, cnt = presidio_engine.mask_text(content)
+            pii_mapping.update(m_map)
+            total_pii_count += cnt
+            if role == "user":
+                raw_prompt += content + "\n"
+            masked_messages.append({"role": role, "content": masked_text})
+        elif isinstance(content, list):
+            new_parts = []
+            for part in content:
+                if isinstance(part, dict) and part.get("type") == "text":
+                    text_val = part.get("text", "")
+                    masked_text, m_map, cnt = presidio_engine.mask_text(text_val)
+                    pii_mapping.update(m_map)
+                    total_pii_count += cnt
+                    raw_prompt += text_val + "\n"
+                    new_parts.append({"type": "text", "text": masked_text})
+                elif isinstance(part, dict) and part.get("type") == "image_url":
+                    new_parts.append(part)
+                    img_url = part.get("image_url", {}).get("url", "")
+                    if "base64" in img_url:
+                        raw_image_b64 = img_url
+                else:
+                    new_parts.append(part)
+            masked_messages.append({"role": role, "content": new_parts})
+        else:
+            masked_messages.append({"role": role, "content": str(content)})
 
     raw_prompt = raw_prompt.strip()
 
@@ -201,15 +180,14 @@ async def chat_completions(
     cached_payload = await semantic_cache.get(raw_prompt)
     if cached_payload and not raw_image_b64:
         execution_time_ms = (time.time() - start_time) * 1000
-        masked_prompt_cache, _, pii_count_cache = presidio_engine.mask_text(raw_prompt)
         background_tasks.add_task(
             neon_audit_logger.log_request,
             request_id=request_id,
             client_ip=client_ip,
-            masked_prompt=masked_prompt_cache,
+            masked_prompt=raw_prompt,
             model_id=resolved_model,
             response_formats=cached_payload.get("formats", {}),
-            pii_count=pii_count_cache,
+            pii_count=total_pii_count,
             cached_hit=True,
             execution_time_ms=execution_time_ms,
             status_code=200,
@@ -219,33 +197,33 @@ async def chat_completions(
         cached_payload["meta"]["model_id"] = resolved_model
         return cached_payload
 
-    masked_prompt, pii_mapping, pii_count = presidio_engine.mask_text(raw_prompt)
     redacted_image_preview = ""
     if raw_image_b64:
         redacted_image_preview, ocr_masked_text, ocr_mapping, ocr_pii_count = presidio_engine.process_multimodal_ocr(raw_image_b64)
         pii_mapping.update(ocr_mapping)
-        pii_count += ocr_pii_count
+        total_pii_count += ocr_pii_count
 
         if ocr_masked_text:
-            if masked_prompt:
-                masked_prompt = f"{masked_prompt}\n\n--- OCR EXTRACTED TEXT (SANITIZED) ---\n{ocr_masked_text}"
+            ocr_block = f"\n\n--- OCR EXTRACTED TEXT (SANITIZED) ---\n{ocr_masked_text}"
+            if masked_messages and masked_messages[-1]["role"] == "user":
+                last_content = masked_messages[-1]["content"]
+                if isinstance(last_content, str):
+                    masked_messages[-1]["content"] += ocr_block
+                elif isinstance(last_content, list):
+                    last_content.append({"type": "text", "text": ocr_block})
             else:
-                masked_prompt = f"Extract information from the following invoice:\n\n--- OCR EXTRACTED TEXT (SANITIZED) ---\n{ocr_masked_text}"
+                masked_messages.append({"role": "user", "content": f"Extract invoice:{ocr_block}"})
 
     raw_llm_response = ""
     max_tokens_clamped = min(request_data.max_tokens or MAX_OUTPUT_TOKENS_CEILING, MAX_OUTPUT_TOKENS_CEILING)
-
-    # Use Singleton HTTP Client from FastAPI lifespan or create fallback
-    client = getattr(http_request.app.state, "http_client", None)
-    close_client = False
-    if client is None:
-        client = httpx.AsyncClient(timeout=httpx.Timeout(connect=3.0, read=60.0, write=10.0, pool=10.0))
-        close_client = True
+    client = getattr(http_request.app.state, "http_client", None) or httpx.AsyncClient(
+        timeout=httpx.Timeout(connect=3.0, read=60.0, write=10.0, pool=10.0)
+    )
 
     try:
         vllm_payload = {
             "model": resolved_model or settings.vllm_model_name,
-            "messages": [{"role": "user", "content": masked_prompt}],
+            "messages": masked_messages,
             "temperature": request_data.temperature,
             "max_tokens": max_tokens_clamped,
         }
@@ -265,11 +243,7 @@ async def chat_completions(
             status_code=503,
             detail=f"AI Inference Engine is currently initializing or unreachable ({type(e).__name__}). Please ensure vLLM is loaded.",
         )
-    finally:
-        if close_client:
-            await client.aclose()
 
-    # Guardrails post-inference check
     is_output_safe, output_violation = guardrails_engine.validate_output(raw_llm_response)
     if not is_output_safe:
         raise HTTPException(status_code=502, detail=output_violation)
@@ -281,23 +255,14 @@ async def chat_completions(
     )
 
     formats: dict[str, Any] = {}
-
     if parsed_json and isinstance(parsed_json, dict) and not parsed_json.get("error"):
         formats["structured_data"] = parsed_json
-
-    if not formats.get("structured_data") and any(ind in raw_llm_response for ind in MARKDOWN_INDICATORS):
-        formats["markdown_report"] = presidio_engine.unmask_text(raw_llm_response, pii_mapping)
-
-    if parsed_json and isinstance(parsed_json, dict) and parsed_json.get("message"):
-        formats["text_summary"] = parsed_json.get("message")
-    else:
-        formats["text_summary"] = raw_llm_response
 
     if redacted_image_preview:
         formats["redacted_image_base64"] = redacted_image_preview
 
-    unmasked_summary = presidio_engine.unmask_text(formats["text_summary"], pii_mapping)
-    formats["text_summary"] = unmasked_summary
+    unmasked_text = presidio_engine.unmask_text(raw_llm_response, pii_mapping)
+    formats["text_summary"] = unmasked_text
 
     execution_time_ms = (time.time() - start_time) * 1000
 
@@ -306,7 +271,7 @@ async def chat_completions(
         "status": "success",
         "meta": {
             "execution_time_ms": round(execution_time_ms, 2),
-            "pii_redacted_count": pii_count,
+            "pii_redacted_count": total_pii_count,
             "cached_hit": False,
             "json_auto_repaired": was_repaired,
             "schema_validated": is_valid,
@@ -319,10 +284,10 @@ async def chat_completions(
         neon_audit_logger.log_request,
         request_id=request_id,
         client_ip=client_ip,
-        masked_prompt=masked_prompt,
+        masked_prompt=raw_prompt,
         model_id=resolved_model,
         response_formats=formats,
-        pii_count=pii_count,
+        pii_count=total_pii_count,
         cached_hit=False,
         execution_time_ms=execution_time_ms,
         status_code=200,
@@ -336,5 +301,4 @@ async def chat_completions(
 
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("gateway.app.main:app", host=settings.gateway_host, port=settings.gateway_port, reload=True)

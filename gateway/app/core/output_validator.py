@@ -5,7 +5,6 @@ Replaces arbitrary heuristic if/else checks with standard declarative data contr
 """
 
 import json
-import re
 from typing import Any, Literal
 import json_repair
 from pydantic import BaseModel, Field, model_validator, ValidationError
@@ -55,14 +54,10 @@ class OutputValidator:
             return None
 
         cleaned = text.strip()
-        if "```json" in cleaned:
-            parts = cleaned.split("```json")
-            if len(parts) > 1:
-                return parts[1].split("```")[0].strip()
-        elif "```" in cleaned:
+        if "```" in cleaned:
             parts = cleaned.split("```")
             if len(parts) > 1:
-                return parts[1].split("```")[0].strip()
+                return parts[1].removeprefix("json").strip()
 
         if cleaned.startswith("{") or cleaned.startswith("["):
             return cleaned
@@ -79,28 +74,6 @@ class OutputValidator:
             return cleaned[first_bracket:last_bracket + 1].strip()
 
         return None
-
-    def _fallback_repair(self, text: str) -> dict[str, Any] | None:
-        """Heuristic syntax repair for missing closing braces and trailing commas."""
-        cleaned = text.strip()
-        cleaned = re.sub(r",\s*$", "", cleaned)
-        cleaned = re.sub(r",\s*}", "}", cleaned)
-        cleaned = re.sub(r",\s*]", "]", cleaned)
-
-        open_braces = cleaned.count("{")
-        close_braces = cleaned.count("}")
-        if open_braces > close_braces:
-            cleaned += "}" * (open_braces - close_braces)
-
-        open_brackets = cleaned.count("[")
-        close_brackets = cleaned.count("]")
-        if open_brackets > close_brackets:
-            cleaned += "]" * (open_brackets - close_brackets)
-
-        try:
-            return json.loads(cleaned)
-        except (json.JSONDecodeError, ValueError):
-            return None
 
     def parse_and_validate(
         self,
@@ -123,7 +96,7 @@ class OutputValidator:
         try:
             raw_dict = json.loads(json_str)
         except json.JSONDecodeError:
-            # 2. Syntax Auto-Repair if malformed
+            # 2. Syntax Auto-Repair via json-repair
             try:
                 repaired = json_repair.repair_json(json_str, return_objects=True)
                 if isinstance(repaired, (dict, list)):
@@ -132,13 +105,6 @@ class OutputValidator:
                     self.auto_repair_count += 1
             except Exception as repair_err:
                 logger.debug(f"json_repair attempt failed: {repair_err}")
-
-            if raw_dict is None:
-                repaired = self._fallback_repair(json_str)
-                if isinstance(repaired, (dict, list)):
-                    raw_dict = repaired
-                    was_repaired = True
-                    self.auto_repair_count += 1
 
         if not isinstance(raw_dict, dict):
             if isinstance(raw_dict, list):
